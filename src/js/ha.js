@@ -144,6 +144,9 @@
     // Media source: browse a folder, resolve one item to a fetchable (signed) URL.
     function browseMedia(id) { return wsRequest({ type: 'media_source/browse_media', media_content_id: id }); }
     function dashboardConfig(urlPath) { return wsRequest({ type: 'lovelace/config', url_path: urlPath || null }); }
+    function cameraStream(entity, format) {
+        return wsRequest({ type: 'camera/stream', entity_id: entity, format: format || 'hls' }).then(function (r) { return base() + r.url; });
+    }
     function resolveMedia(id) {
         return wsRequest({ type: 'media_source/resolve_media', media_content_id: id }).then(function (r) {
             return { url: base() + r.url, mime_type: r.mime_type };
@@ -159,6 +162,7 @@
         browseMedia: browseMedia,
         resolveMedia: resolveMedia,
         dashboardConfig: dashboardConfig,
+        cameraStream: cameraStream,
         idlePath: function () { return cfg.idle || null; },
         connect: connect,
         isConnected: function () { return connected; },

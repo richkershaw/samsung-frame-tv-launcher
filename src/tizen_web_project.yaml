@@ -116,6 +116,7 @@ files:
   - js/sound.js
   - js/tizen-mock.js
   - js/ui.js
+  - js/vendor/hls.light.min.js
   - js/wallpaper.js
   - js/wallpapers.js
   - js/weather.js

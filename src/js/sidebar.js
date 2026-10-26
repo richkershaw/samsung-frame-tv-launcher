@@ -64,6 +64,7 @@
     var panelCamImgs = []; // panel camera <img>, refreshed flicker-free alongside the live ones
     var panelBoxes = [];   // panel card boxes, updated in place
     var camOverlay = null; // { img, base } when the pop-over is open
+    var hlsInst = null;    // active hls.js instance while a live stream plays in the pop-over
     var lastSig = '';
 
     function configured() { return window.HA && HA.configured(); }
@@ -460,22 +461,59 @@
         ov = el('div', 'cam-overlay hidden'); ov.id = 'cam-overlay';
         var box = el('div', 'cam-box');
         box.appendChild(el('div', 'cam-title'));
-        var img = new Image(); img.className = 'cam-big'; box.appendChild(img);
-        box.appendChild(el('div', 'cam-none', 'camera unavailable'));
+        var frame = el('div', 'cam-frame');
+        var img = new Image(); img.className = 'cam-big'; frame.appendChild(img);
+        var vid = document.createElement('video');
+        vid.className = 'cam-video'; vid.muted = true;
+        vid.setAttribute('muted', ''); vid.setAttribute('playsinline', ''); vid.setAttribute('autoplay', '');
+        vid.style.display = 'none';
+        frame.appendChild(vid);
+        frame.appendChild(el('div', 'cam-none', 'camera unavailable'));
+        box.appendChild(frame);
         box.appendChild(el('div', 'cam-hint', 'Back to close'));
         ov.appendChild(box);
         $('stage').appendChild(ov);
         return ov;
     }
+    // Prefer a streamable entity: one that supports STREAM directly, else its *_hd_stream sibling.
+    function streamEntityFor(entity) {
+        var s = getState(entity);
+        if (s && (Number(s.attributes.supported_features) & 2)) return entity;
+        if (getState(entity + '_hd_stream')) return entity + '_hd_stream';
+        return entity;
+    }
+    function stopStream() {
+        if (hlsInst) { try { hlsInst.destroy(); } catch (e) {} hlsInst = null; }
+        var ov = $('cam-overlay'), v = ov && ov.querySelector('.cam-video');
+        if (v) { try { v.pause(); } catch (e) {} v.onplaying = null; v.removeAttribute('src'); try { v.load(); } catch (e) {} v.style.display = 'none'; }
+    }
+    // Live HLS over the snapshot: the snapshot shows until the stream is playing, and stays if it
+    // fails. Torn down on close so HA sheds the encoder session.
+    function startStream(entity, video) {
+        if (!window.Hls || !window.HA || !HA.cameraStream || !HA.isConnected || !HA.isConnected()) return;
+        if (!Hls.isSupported()) return;
+        HA.cameraStream(streamEntityFor(entity), 'hls').then(function (url) {
+            var ov = $('cam-overlay');
+            if (!ov || ov.classList.contains('hidden')) return;   // closed while resolving
+            hlsInst = new Hls({ maxBufferLength: 10, backBufferLength: 10, liveSyncDurationCount: 3 });
+            hlsInst.loadSource(url);
+            hlsInst.attachMedia(video);
+            hlsInst.on(Hls.Events.MANIFEST_PARSED, function () { video.play().then(null, function () {}); });
+            hlsInst.on(Hls.Events.ERROR, function (e, data) { if (data && data.fatal) { DevLog.log('HLS fatal: ' + data.type); stopStream(); } });
+            video.onplaying = function () { video.style.display = ''; };
+        }, function (e) { DevLog.log('camera stream: ' + DevLog.errorText(e)); });
+    }
     function openCamera(entity) {
         var ov = ensureOverlay(), s = getState(entity), url = camUrl(s);
         ov.querySelector('.cam-title').textContent = labelOf(entity);
-        var img = ov.querySelector('.cam-big'), none = ov.querySelector('.cam-none');
+        var img = ov.querySelector('.cam-big'), none = ov.querySelector('.cam-none'), vid = ov.querySelector('.cam-video');
+        stopStream();
         if (url) { img.style.display = ''; none.style.display = 'none'; img.src = bust(url); camOverlay = { img: img, base: url }; }
         else { img.style.display = 'none'; none.style.display = ''; camOverlay = null; }
         ov.classList.remove('hidden');
+        if (url) startStream(entity, vid);   // go live over the snapshot
     }
-    function closeCamera() { var ov = $('cam-overlay'); if (ov) ov.classList.add('hidden'); camOverlay = null; }
+    function closeCamera() { stopStream(); var ov = $('cam-overlay'); if (ov) ov.classList.add('hidden'); camOverlay = null; }
 
     // ---- camera frame refresh (double-buffered: no flicker) ----
     function swap(img, base) { var n = new Image(); n.onload = function () { img.src = n.src; }; n.src = bust(base); }

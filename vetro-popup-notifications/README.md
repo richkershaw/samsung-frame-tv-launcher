@@ -60,6 +60,11 @@ there is no window. Only a native process can put pixels over another app.
    this is unsigned), switch it **on**, open its **Popups** page and set the port and webhook.
    Use **Test** to show a popup immediately.
 
+   The Shard serves the same page on its own port as well: open `http://<tv-ip>:8079/` in a
+   browser (add `?token=…` if you set a token). That copy runs without Vetro's sandboxed frame,
+   so it is the one to use if the page inside the dashboard ever fails to load or save its
+   settings.
+
 ## Settings — a worked example
 
 On the Shard's page:
@@ -68,12 +73,13 @@ On the Shard's page:
 | --- | --- | --- |
 | `port` | `8079` | What `/notify` listens on |
 | `bind` | `0.0.0.0` | LAN only |
-| `token` | `s3cret` (or blank) | Requests then need `?token=s3cret` or `X-Popup-Token` |
+| `token` | `s3cret` (or blank) | Guards `/notify`, `/dismiss`, `/event` and the page's Test buttons. Callers add `?token=…` or `X-Popup-Token`. The settings fields stay open, so the token can always be changed or cleared. |
 | `webhookUrl` | `http://homeassistant.local:8123/api/webhook/tv-popups` | Where button presses go |
 | `emitDismiss` | on | Also send an event when the popup closes |
 | `dismissEvent` / `dismissLabel` | `dismiss` / `Dismiss` | The always-present last button |
 | `defaultTimeout` / `defaultLocation` | `60` / `tr` | Seconds (0 = stay) and position |
-| `pauseMedia` / `resumeMedia` / `pauseKey` | off / off / `XF86AudioPlay` | |
+| `pauseMedia` / `resumeMedia` | off / off | Pause before showing, resume when it closes |
+| `pauseKey` / `resumeKey` | `XF86AudioPause` / `XF86AudioPlay` | X keysyms; play and pause are separate keys on this TV |
 | `keyMode` | `auto` | See **Remote keys** |
 | `homeKeyCode` | `0` | Optional extra dismiss code |
 
@@ -118,6 +124,7 @@ rest_command:
           {"title": "Front door",
            "message": "Someone is at the front door",
            "pauseMedia": true,
+  "resumeMedia": true,
            "timeout": 45,
            "location": "tr",
            "image": "http://homeassistant.local:8123{{ state_attr('camera.front_door', 'entity_picture') }}",
@@ -211,8 +218,10 @@ Still worth checking on your TV:
   `wm.policy.win.user.geometry` hint) are the launcher's; a different model may need them nudged.
 - **Over DRM-protected video** an overlay may not composite. Over a normal app, HDMI or the
   launcher it does.
-- **`pauseKey`** is a guess: `XF86AudioPlay` is an X keysym; confirm it toggles play/pause for
-  your source. `resumeMedia` re-sends it on close, which only works for a toggle.
+- **`pauseKey` / `resumeKey`** default to `XF86AudioPause` and `XF86AudioPlay`. On this platform
+  play and pause are *separate* keysyms (Vetro's own whitelist maps them one to each), so pausing
+  means sending `XF86AudioPause` and resuming means `XF86AudioPlay`. Injected keys go to the app in
+  the foreground, which is why the resume is sent a moment after the popup has hidden.
 - **One popup at a time**; a new `notify` replaces the current one. The notifier is a single
   resident process in its own `vetro-popup-notifications` systemd unit, supervised by the Shard.
 - Snapshots are stills, fetched when the popup is shown — there is no live view by design.

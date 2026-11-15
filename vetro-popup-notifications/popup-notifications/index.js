@@ -56,8 +56,9 @@ var DEFAULTS = {
     dismissEvent: 'dismiss',
     dismissLabel: 'Dismiss',
     pauseMedia: false,         // payload default for "pauseMedia"
-    resumeMedia: false,        // send pauseKey again when the popup closes
-    pauseKey: 'XF86AudioPlay',
+    resumeMedia: false,        // send resumeKey when the popup closes
+    pauseKey: 'XF86AudioPause', // X keysyms: play and pause are separate keys on this platform
+    resumeKey: 'XF86AudioPlay',
     keyMode: 'auto',           // auto | evas | evdev | grab — see the README on remote keys
     homeKeyCode: 0,            // raw evdev code that also dismisses (0 = off)
     defaultTimeout: 60,
@@ -87,6 +88,7 @@ module.exports = function (ctx) {
         out.pauseMedia = out.pauseMedia === true;
         out.resumeMedia = out.resumeMedia === true;
         out.pauseKey = KEY_NAME.test(out.pauseKey || '') ? out.pauseKey : DEFAULTS.pauseKey;
+        out.resumeKey = KEY_NAME.test(out.resumeKey || '') ? out.resumeKey : DEFAULTS.resumeKey;
         out.keyMode = ['auto', 'evas', 'evdev', 'grab'].indexOf(out.keyMode) >= 0 ? out.keyMode : DEFAULTS.keyMode;
         out.homeKeyCode = clampInt(out.homeKeyCode, 0, 767, DEFAULTS.homeKeyCode);
         out.defaultTimeout = clampInt(out.defaultTimeout, 0, 3600, DEFAULTS.defaultTimeout);
@@ -386,7 +388,7 @@ module.exports = function (ctx) {
             if (body.image && !img) log('notify: image could not be fetched, showing without it');
             try { writeJobAtomically(job); }
             catch (e) { return cb('could not write the job: ' + e.message); }
-            var pre = job.pauseMedia ? sendKey(cfg.pauseKey) : Promise.resolve(null);
+            var pre = job.pauseMedia ? sendKey(cfg.pauseKey, 'pause') : Promise.resolve(null);
             pre.then(function () {
                 pausedForNotification = job.pauseMedia;
             }).then(function () { return poke('notify'); }).then(function () {
@@ -403,9 +405,14 @@ module.exports = function (ctx) {
         fs.renameSync(tmp, f.job);
     }
 
-    function sendKey(name) {
+    function sendKey(name, label) {
         if (!KEY_NAME.test(name)) return Promise.resolve(null);
-        return execute('/usr/bin/input_keyevent ' + name, 5000).catch(function () { return null; });
+        return execute('/usr/bin/input_keyevent ' + name, 5000).then(function (r) {
+            var rc = r && typeof r.exit_code === 'number' ? r.exit_code : '?';
+            var extra = (r && r.timed_out ? ' timed out' : '') + (r && r.stderr ? ' ' + String(r.stderr).trim().slice(0, 120) : '');
+            log((label || 'key') + ' ' + name + ' rc=' + rc + extra);
+            return r;
+        }).catch(function (e) { log((label || 'key') + ' ' + name + ' failed: ' + e.message); return null; });
     }
 
     // ------------------------------------------------------------------ events
@@ -425,7 +432,10 @@ module.exports = function (ctx) {
             at: new Date().toISOString()
         };
         detail.lastEvent = name;
-        var resume = (name === cfg.dismissEvent && pausedForNotification && cfg.resumeMedia) ? sendKey(cfg.pauseKey) : Promise.resolve(null);
+        // Give the popup a moment to hide so the resume key reaches the app, not our own window.
+        var resume = (name === cfg.dismissEvent && pausedForNotification && cfg.resumeMedia)
+            ? new Promise(function (r) { setTimeout(r, 250); }).then(function () { return sendKey(cfg.resumeKey, 'resume'); })
+            : Promise.resolve(null);
         if (name === cfg.dismissEvent) pausedForNotification = false;
         resume.then(function () { postWebhook(outgoing, cfg, cb); });
     }
@@ -459,6 +469,23 @@ module.exports = function (ctx) {
         return req.headers && req.headers['x-popup-token'] === cfg.token;
     }
 
+    // The token guards the action surface — the routes that make the TV do something. The
+    // settings routes (/config, /logs) stay open on the LAN on purpose: without them the page
+    // that sets the token could lock you out of changing the token. The token value is never
+    // returned by /config, so an open /config does not leak it.
+    function needsToken(route) {
+        return route === '/notify' || route === '/dismiss' || route === '/event' || route === '/test' || route === '/debug';
+    }
+
+    // The config as the page may see it: the token itself is replaced by a flag.
+    function publicConfig(cfg) {
+        var out = {}, k;
+        for (k in cfg) if (cfg.hasOwnProperty(k) && k !== 'token') out[k] = cfg[k];
+        out.token = '';
+        out.tokenSet = !!cfg.token;
+        return out;
+    }
+
     function readBody(req, cb) {
         var chunks = [], size = 0, done = false;
         req.on('data', function (d) {
@@ -480,9 +507,16 @@ module.exports = function (ctx) {
     function handle(req, res) {
         var cfg = config();   // read per request: a webhook set on the page must take effect at once
         var route = ((req.url || '').split('?')[0] || '/').replace(/\/+$/, '') || '/';
-        if (!authorised(req, cfg)) return sendJson(res, 401, { error: 'unauthorised' });
 
-        if (req.method === 'GET' && (route === '/' || route === '/status')) {
+        // The settings page itself needs no token: open http://<tv>:<port>/ in a browser. Its
+        // fetches carry ?token= if one is set, which the API routes below enforce. Serving it here
+        // means the page also works without Vetro's sandboxed frame, which is where a page that
+        // "will not save or restore" usually turns out to be a sandbox/CORS problem.
+        if (req.method === 'GET' && (route === '/' || route === '/ui')) return api('ui', req, res);
+
+        if (!authorised(req, cfg) && needsToken(route)) return sendJson(res, 401, { error: 'unauthorised' });
+
+        if (req.method === 'GET' && route === '/status') {
             return sendJson(res, 200, { ok: true, running: detail.running, port: cfg.port,
                 webhook: cfg.webhookUrl ? 'set' : 'unset', last: detail.lastResult, error: detail.error });
         }
@@ -512,6 +546,8 @@ module.exports = function (ctx) {
                 });
             });
         }
+        // The settings API shares its handlers with the plugin page: /config, /logs, /debug, /test.
+        if (api(route.slice(1), req, res)) return;
         sendJson(res, 404, { error: 'not found' });
     }
 
@@ -540,7 +576,11 @@ module.exports = function (ctx) {
 
     // The Shard's page (in the dashboard) reads and writes the config here. The
     // notification listener is a separate port and not part of this.
-    function routeConfig(req, res, sub) {
+    // The settings API, shared by two hosts: the plugin page Vetro serves (in its sandboxed
+    // frame, under /plugins/<id>/s/<token>/api/...) and the Shard's own listener (so the same
+    // page also works opened directly at http://<tv>:<port>/, without the sandbox or a token in
+    // the path). sub is "ui", "config", "logs", "debug" or "test".
+    function api(sub, req, res) {
         // The dashboard page. Vetro asks for "ui" because the manifest sets ui.label, and
         // expects the Shard to serve the HTML itself (docs/plugins.md).
         if (sub === 'ui' && req.method === 'GET') {
@@ -609,11 +649,7 @@ module.exports = function (ctx) {
             return true;
         }
         if (sub === 'config' && req.method === 'GET') {
-            var raw = {};
-            try { raw = ctx.config.get() || {}; } catch (e) { raw = {}; }
-            var merged = {}, k;
-            for (k in DEFAULTS) if (DEFAULTS.hasOwnProperty(k)) merged[k] = raw[k] === undefined ? DEFAULTS[k] : raw[k];
-            sendJson(res, 200, { config: merged, defaults: DEFAULTS, state: detail });
+            sendJson(res, 200, { config: publicConfig(config()), defaults: DEFAULTS, state: detail });
             return true;
         }
         if (sub === 'config' && req.method === 'POST') {
@@ -626,13 +662,18 @@ module.exports = function (ctx) {
                 var stored = {};
                 try { stored = ctx.config.get() || {}; } catch (e) { stored = {}; }
                 var k;
-                for (k in DEFAULTS) if (DEFAULTS.hasOwnProperty(k) && body[k] !== undefined) stored[k] = body[k];
+                for (k in DEFAULTS) if (DEFAULTS.hasOwnProperty(k) && k !== 'token' && body[k] !== undefined) stored[k] = body[k];
+                // The token is write-only and blank means "unchanged", so an ordinary save cannot
+                // clear it by accident; an explicit flag removes it.
+                if (body.clearToken === true) stored.token = '';
+                else if (typeof body.token === 'string' && body.token !== '') stored.token = body.token;
+                if (typeof stored.token !== 'string') stored.token = '';
                 try { ctx.config.set(stored); }
                 catch (e) { return sendJson(res, 500, { error: e.message }); }
                 var cfg = config();
                 restartServer();
                 restartNotifier();
-                sendJson(res, 200, { ok: true, config: cfg });
+                sendJson(res, 200, { ok: true, config: publicConfig(cfg) });
             });
             return true;
         }
@@ -684,7 +725,7 @@ module.exports = function (ctx) {
                 lastResult: detail.lastResult, lastEvent: detail.lastEvent, error: detail.error };
         },
         route: function (req, res, sub) {
-            try { return routeConfig(req, res, sub); }
+            try { return api(sub, req, res); }
             catch (e) { log('route: ' + e.message); sendJson(res, 500, { error: 'internal' }); return true; }
         }
     };

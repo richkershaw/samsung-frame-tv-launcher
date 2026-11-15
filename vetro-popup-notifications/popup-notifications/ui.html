@@ -45,8 +45,13 @@
         </div>
       </div>
       <label for="token">Shared token</label>
-      <input id="token" name="token" type="text" placeholder="blank = open on the LAN">
-      <div class="hint">If set, requests need <code>?token=…</code> or the <code>X-Popup-Token</code> header.</div>
+      <input id="token" name="token" type="text" placeholder="blank = no token (open on the LAN)">
+      <div class="hint">Leave blank to keep the saved token. It guards the action routes
+        (<code>/notify</code>, <code>/dismiss</code>, <code>/event</code>) and the Test buttons. Saving a
+        token here also lets this page use it for Test straight away; on a later visit, open the page as
+        <code>?token=…</code> to use Test. The settings fields themselves stay open, so the token can
+        always be changed or removed.</div>
+      <label class="check"><input id="clearToken" type="checkbox"> Remove the saved token</label>
     </fieldset>
 
     <fieldset>
@@ -103,8 +108,18 @@
       </div>
       <label class="check"><input id="pauseMedia" name="pauseMedia" type="checkbox"> Pause media by default</label>
       <label class="check"><input id="resumeMedia" name="resumeMedia" type="checkbox"> Resume when the popup closes</label>
-      <label for="pauseKey">Pause key (X keysym)</label>
-      <input id="pauseKey" name="pauseKey" type="text" placeholder="XF86AudioPlay">
+      <div class="row">
+        <div>
+          <label for="pauseKey">Pause key (X keysym)</label>
+          <input id="pauseKey" name="pauseKey" type="text" placeholder="XF86AudioPause">
+        </div>
+        <div>
+          <label for="resumeKey">Resume key (X keysym)</label>
+          <input id="resumeKey" name="resumeKey" type="text" placeholder="XF86AudioPlay">
+        </div>
+      </div>
+      <div class="hint">Play and pause are separate keys on this TV, not one toggle. Injected keys go
+        to the app in the foreground.</div>
     </fieldset>
 
     <button class="primary" type="submit">Save</button>
@@ -148,12 +163,48 @@
 
 <script>
   var $ = function (id) { return document.getElementById(id); };
-  var FIELDS = ['port','bind','token','webhookUrl','emitDismiss','dismissEvent','dismissLabel','defaultTimeout','defaultLocation','pauseMedia','resumeMedia','pauseKey','keyMode','homeKeyCode'];
+  var FIELDS = ['port','bind','token','webhookUrl','emitDismiss','dismissEvent','dismissLabel','defaultTimeout','defaultLocation','pauseMedia','resumeMedia','pauseKey','resumeKey','keyMode','homeKeyCode'];
 
-  function get(name) { return fetch(name).then(function (r) { return r.json(); }); }
+  // On Vetro's plugin page the token is in the URL path; opened straight on the Shard's own port
+  // it is a query parameter. Carrying the page's query string keeps both working.
+  // The page's own token, in memory only: taken from ?token=… or from a token you just saved
+  // here, and sent on every request so the Test and Solid buttons work without reopening the
+  // page. Settings do not need it; those routes stay open so the token can always be changed.
+  var Q = location.search || '';
+  var mT = /[?&]token=([^&#]*)/.exec(Q);
+  var pageToken = mT ? decodeURIComponent(mT[1]) : '';
+
+  function headers(json) {
+    var h = json ? { 'Content-Type': 'application/json' } : {};
+    if (pageToken) h['X-Popup-Token'] = pageToken;
+    return h;
+  }
+  function errText(r, j) {
+    if (r.status === 401) return 'unauthorised - a token is set; open this page as ?token=… (or save the token here) to use Test';
+    return j.error || ('HTTP ' + r.status);
+  }
+  function get(name) {
+    return fetch(name + Q, { headers: headers(false) }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = {}; try { j = JSON.parse(t); } catch (e) { /* not JSON */ }
+        if (!r.ok) throw new Error(errText(r, j));
+        return j;
+      });
+    });
+  }
   function post(name, body) {
-    return fetch(name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (j) { return { code: r.status, body: j }; }); });
+    return fetch(name + Q, { method: 'POST', headers: headers(true), body: JSON.stringify(body) })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var j = {}; try { j = JSON.parse(t); } catch (e) { /* not JSON */ }
+          return { ok: r.ok, code: r.status, body: j, err: errText(r, j) };
+        });
+      });
+  }
+
+  function summary(c) {
+    return 'webhook: ' + (c.webhookUrl ? 'set' : 'not set') + ' · port ' + c.port + ' · keys ' + c.keyMode +
+      ' · token ' + (c.tokenSet ? 'set' : 'not set');
   }
 
   get('config').then(function (d) {
@@ -163,6 +214,8 @@
       if (el.type === 'checkbox') el.checked = c[k] === true;
       else if (c[k] != null) el.value = c[k];
     });
+    $('clearToken').checked = false;
+    $('saveStatus').textContent = 'Loaded — ' + summary(c);
   }).catch(function (e) { $('saveStatus').textContent = 'Could not load settings: ' + e.message; });
 
   $('cfg').addEventListener('submit', function (e) {
@@ -172,9 +225,15 @@
       var el = $(k); if (!el) return;
       body[k] = el.type === 'checkbox' ? el.checked : el.value;
     });
+    body.clearToken = $('clearToken').checked;
     $('saveStatus').textContent = 'Saving…';
     post('config', body).then(function (r) {
-      $('saveStatus').textContent = r.code === 200 ? 'Saved. The listener restarted on the new settings.' : ('Error: ' + (r.body.error || r.code));
+      if (!r.ok) { $('saveStatus').textContent = 'Error: ' + r.err; return; }
+      if (body.clearToken) pageToken = '';
+      else if (typeof body.token === 'string' && body.token) pageToken = body.token;
+      $('clearToken').checked = false;
+      $('token').value = '';
+      $('saveStatus').textContent = 'Saved — ' + summary(r.body.config || {});
     }).catch(function (err) { $('saveStatus').textContent = 'Error: ' + err.message; });
   });
 
@@ -186,7 +245,7 @@
     payload.image = $('testImage').value || payload.image || null;
     $('testStatus').textContent = 'Sending…';
     post('test', payload).then(function (r) {
-      $('testStatus').textContent = r.code === 200 ? 'Sent.' : ('Error: ' + (r.body.error || r.code));
+      $('testStatus').textContent = r.ok ? 'Sent.' : ('Error: ' + r.err);
     }).catch(function (err) { $('testStatus').textContent = 'Error: ' + err.message; });
   });
 
@@ -215,7 +274,7 @@
   $('solid').addEventListener('click', function () {
     $('testStatus').textContent = 'Sending…';
     post('debug', { mode: 'solid' }).then(function (r) {
-      $('testStatus').textContent = r.code === 200 ? 'Sent.' : ('Error: ' + (r.body.error || r.code));
+      $('testStatus').textContent = r.ok ? 'Sent.' : ('Error: ' + r.err);
     }).catch(function (err) { $('testStatus').textContent = 'Error: ' + err.message; });
   });
 </script>

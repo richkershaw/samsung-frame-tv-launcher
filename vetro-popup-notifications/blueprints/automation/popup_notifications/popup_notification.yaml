@@ -1,0 +1,111 @@
+blueprint:
+  name: TV popup notification
+  description: >-
+    Show a popup over the running app on a rooted Samsung TV (the popup-notifications
+    Shard) when a trigger fires — optionally with the current snapshot from a camera and
+    one button that calls back. A Dismiss button is always added.
+
+    Requires a `rest_command.tv_popup` that posts to the TV; see the project README for
+    the two-line definition. The webhook that receives button presses is a separate
+    automation (the README's "Act on a button" example).
+  domain: automation
+  source_url: https://github.com/OWNER/vetro-popup-notifications/blob/main/blueprints/automation/popup_notifications/popup_notification.yaml
+  input:
+    trigger_entity:
+      name: Trigger entity
+      description: The entity that fires the popup (a doorbell sensor, a motion sensor, …).
+      selector:
+        entity: {}
+    trigger_to:
+      name: Trigger state
+      default: "on"
+      selector:
+        text: {}
+    title:
+      name: Title
+      default: Front door
+      selector:
+        text: {}
+    message:
+      name: Message
+      default: Someone is at the front door
+      selector:
+        text:
+          multiline: true
+    image_entity:
+      name: Snapshot camera (optional)
+      description: A camera entity whose current snapshot is shown in the popup.
+      default: ""
+      selector:
+        entity:
+          domain: camera
+    ha_base_url:
+      name: Home Assistant base URL
+      description: Used to turn the camera's snapshot path into an absolute URL for the TV.
+      default: "http://homeassistant.local:8123"
+      selector:
+        text: {}
+    location:
+      name: Position
+      default: tr
+      selector:
+        select:
+          options: [tl, tr, bl, br, center]
+    timeout:
+      name: Timeout (seconds)
+      description: 0 keeps the popup until it is dismissed.
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 3600
+          unit_of_measurement: seconds
+          mode: box
+    pause_media:
+      name: Pause media
+      default: false
+      selector:
+        boolean: {}
+    action_label:
+      name: Button label (optional)
+      default: ""
+      selector:
+        text: {}
+    action_event:
+      name: Button event (optional)
+      description: The event name sent to the webhook when the button is pressed.
+      default: ""
+      selector:
+        text: {}
+    action_context:
+      name: Button context (JSON, optional)
+      default: "{}"
+      selector:
+        text:
+          multiline: true
+mode: single
+max_exceeded: silent
+variables:
+  v_title: !input title
+  v_message: !input message
+  v_image: !input image_entity
+  v_base: !input ha_base_url
+  v_location: !input location
+  v_timeout: !input timeout
+  v_pause: !input pause_media
+  v_label: !input action_label
+  v_event: !input action_event
+  v_context: !input action_context
+trigger:
+  - platform: state
+    entity_id: !input trigger_entity
+    to: !input trigger_to
+action:
+  - action: rest_command.tv_popup
+    data:
+      payload: >-
+        {% set img = v_base ~ state_attr(v_image, 'entity_picture') if v_image else none %}
+        {% set ctx = (v_context or '{}') | from_json %}
+        {% set actions = [ {'label': v_label, 'event': v_event, 'context': ctx} ] if (v_label and v_event) else [] %}
+        {{ {'title': v_title, 'message': v_message, 'image': img, 'location': v_location,
+             'timeout': v_timeout, 'pauseMedia': v_pause, 'actions': actions} | tojson }}

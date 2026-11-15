@@ -185,8 +185,11 @@
         if (UI.isVisible('home')) UI.refresh();
     }
 
-    // Consoles sit just below the wrapped apps block, whatever height it is.
+    // Consoles sit just below the wrapped apps block, whatever height it is. Never measured while the
+    // page is hidden: a backgrounded Tizen page reports collapsed geometry, so a console top worked
+    // out from it sticks until the next layout change. Guarded here and re-run on becoming visible.
     function positionConsoles() {
+        if (document.hidden) return;
         var appsSec = $('apps-section');
         $('inputs-section').style.top = (appsSec.offsetTop + appsSec.offsetHeight + 30) + 'px';
     }
@@ -232,6 +235,7 @@
         if (window.Weather) actions = actions.concat(Weather.actions());
         if (window.RenderProbe) actions = actions.concat(RenderProbe.actions());
         if (window.PlatformProbe) actions = actions.concat(PlatformProbe.actions());
+        if (window.LaunchHelper) actions = actions.concat(LaunchHelper.actions());
         if (window.MQTT && MQTT.configured()) actions.push({
             label: 'MQTT: test connection to Home Assistant',
             run: function () {
@@ -274,7 +278,20 @@
 
     function launchApp(item) {
         if (window.MQTT) MQTT.reportApp(item);
-        runLogged('Launch ' + item.id, Apps.launch(item.id)).catch(function (err) {
+        // Apps only Smart Hub may open (config.js -> helper.apps) go through the launch helper; a
+        // plain launch of those is accepted and then silently bounces to Smart Hub.
+        var viaHelper = window.LaunchHelper && LaunchHelper.isHelperApp(item.id);
+        var attempt = viaHelper ? LaunchHelper.launch(item.id) : Apps.launch(item.id);
+        runLogged('Launch ' + item.id + (viaHelper ? ' (helper)' : ''), attempt).catch(function (err) {
+            if (viaHelper) {
+                // The helper is the only thing that works for these apps, but try the public API once
+                // anyway: if the service or Developer Mode is missing, this is all there is.
+                log('Launch helper failed, trying the public API: ' + DevLog.errorText(err));
+                runLogged('Launch ' + item.id + ' (direct)', Apps.launch(item.id)).catch(function (err2) {
+                    UI.toast('Could not open ' + item.label + ': ' + DevLog.errorText(err2));
+                });
+                return;
+            }
             UI.toast('Could not open ' + item.label + ': ' + DevLog.errorText(err));
         });
     }
@@ -559,6 +576,7 @@
             }
             updateClock();
             refreshInputStatus();
+            positionConsoles();
             // Back on the launcher's own screen (an app was closed, or we returned from a viewer).
             if (window.MQTT && !state.tvMode) MQTT.reportHome();
             if (UI.isVisible('home')) Wallpaper.homeShown();

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The runtime on the TV: the same target Vetro's launcher uses (dock/Launcher.csproj). -->
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AssemblyName>notify</AssemblyName>
+    <RootNamespace>PopupNotify</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Runtime knobs for a small, quiet, long-lived process. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <TieredCompilation>true</TieredCompilation>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

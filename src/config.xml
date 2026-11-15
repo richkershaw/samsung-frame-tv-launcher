@@ -10,6 +10,8 @@
     <name>Arn0 Launcher</name>
 
     <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+    <!-- Web service: the bundled launch helper (service/index.js). See README, "Apps only Smart Hub opens". -->
+    <feature name="http://tizen.org/feature/web.service"/>
 
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <tizen:privilege name="http://tizen.org/privilege/application.info"/>
@@ -18,9 +20,19 @@
     <!-- Open-Meteo request for the screen saver (js/config.js → weather) and the development log -->
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <access origin="*" subdomains="true"/>
+    <!-- The page talks to the helper service over http://127.0.0.1:8078. -->
+    <tizen:allow-mixed-content>true</tizen:allow-mixed-content>
 
     <!-- Lets the TV start the app in the background at power-on so opening it is faster -->
     <tizen:metadata key="http://samsung.com/tv/metadata/prelaunch.support" value="true"/>
+
+    <!-- The launch helper (service/index.js): opens apps only Smart Hub may open, over the TV's own
+         developer connection. Started by the page; see README, "Apps only Smart Hub opens". -->
+    <tizen:service id="Arn0Lnchr0.LaunchService" auto-restart="true">
+        <tizen:content src="service/index.js"/>
+        <tizen:name>Launch helper</tizen:name>
+        <tizen:description>Opens apps only Smart Hub may open, over the TV's developer connection</tizen:description>
+    </tizen:service>
 
     <tizen:profile name="tv-samsung"/>
     <tizen:setting screen-orientation="landscape" context-menu="disable"

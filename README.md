@@ -235,6 +235,39 @@ drops names containing service/worker/agent/e-manual. Yellow shows everything wh
 something. The id of the focused app is shown bottom-left — pin it in `config.js` as `{ id: '...' }`,
 which is more reliable than a name match.
 
+### Apps only Smart Hub opens
+
+Some apps are thin "hybrid" shells that only Samsung's Smart Hub is allowed to start. BBC iPlayer is
+one: on the TV it is about 45 KB and loads the BBC's hosted app. A plain `tizen.application.launch`
+of it is **accepted** and then silently bounces you to Smart Hub — there is no error, so the tile
+looks like it did nothing (Channel 4, YouTube and the rest launch normally). The id in `config.js` is
+correct; the platform is what refuses the launch.
+
+To open these, the launcher ships a small background **Web service** (`service/index.js`) that runs
+`0 was_execute <app id>` over the TV's own developer connection (`sdbd`), which is the one channel
+that does open them. The page starts that service and asks it over `http://127.0.0.1:8078`. The ids it
+may open are pinned in `config.js` → `helper.apps`, and listed again in `service/index.js`.
+
+It reaches `sdbd` the same ways a computer does: directly on `127.0.0.1:26101` or the TV's own
+address on `26101` (Developer Mode's Host PC IP must name one of those), or through **Vetro's SDB
+proxy on `26201`** if Vetro is on the TV — which needs no Host PC IP change at all. Whichever answers
+first is used. The ids it may open are pinned in `config.js` → `helper.apps`, and listed again in
+`service/index.js`.
+
+The direct routes only work with **Developer Mode on and Host PC IP set to this TV's own address or
+to `127.0.0.1`**. The TV's `sdbd` accepts a connection only from the address Developer Mode names, so
+with Host PC IP pointing at your computer the helper cannot reach it. While it is set to the TV (or to
+loopback), the computer's `sdb` cannot reach the TV either, and `sdbd` takes one connection at a
+time — so the native tools and the helper are not both usable at once. Set Host PC IP back to run the
+native tools. The Vetro-proxy route avoids all of that.
+
+The helper's endpoint is loopback-only and can do exactly one thing: run `was_execute` for an id
+already on that list. It takes no command from the page, so the most another app on the TV could get
+it to do is open one of those apps.
+
+Two entries in the Lab (Blue) test it: **Launch helper: is the service up?** and **Launch helper: open
+… over the developer connection**. Both write to the log.
+
 ### HDMI inputs
 
 `tizen.systeminfo.getPropertyValue('VIDEOSOURCE')` lists the ports and `tizen.tvwindow.setSource()`

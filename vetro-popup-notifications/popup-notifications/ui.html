@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Popup notifications</title>
+<style>
+  :root { --fg:#101c35; --muted:#5b6880; --bg:#f5f8ff; --card:#ffffff; --line:#d5deee; --accent:#0450ef; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#f5f8ff; --muted:#aab8d1; --bg:#080f23; --card:#101c35; --line:#344360; --accent:#8fbaff; } }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  h1 { font-size:1.15rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 16px; }
+  fieldset { border:1px solid var(--line); border-radius:10px; background:var(--card); margin:0 0 14px; padding:12px 14px; }
+  legend { padding:0 6px; color:var(--muted); }
+  label { display:block; margin:8px 0 2px; }
+  label.check { display:flex; align-items:center; gap:8px; margin:10px 0; }
+  input[type=text], input[type=number], textarea, select { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; font:inherit; }
+  textarea { min-height:120px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div { flex:1 1 160px; }
+  button { margin-top:12px; padding:9px 14px; border-radius:8px; border:1px solid var(--line); background:transparent; color:inherit; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .status { margin-top:10px; color:var(--muted); min-height:1.2em; white-space:pre-wrap; }
+  .hint { color:var(--muted); font-size:12px; margin-top:2px; }
+</style>
+</head>
+<body>
+  <h1>Popup notifications</h1>
+  <p class="sub">Anything that can POST JSON shows a popup over the running app; buttons POST back to a webhook.</p>
+
+  <form id="cfg">
+    <fieldset>
+      <legend>Listener</legend>
+      <div class="row">
+        <div>
+          <label for="port">Port</label>
+          <input id="port" name="port" type="number" min="1" max="65535">
+        </div>
+        <div>
+          <label for="bind">Bind address</label>
+          <input id="bind" name="bind" type="text" placeholder="0.0.0.0">
+          <div class="hint">Keep it on the LAN; never expose it to the internet.</div>
+        </div>
+      </div>
+      <label for="token">Shared token</label>
+      <input id="token" name="token" type="text" placeholder="blank = open on the LAN">
+      <div class="hint">If set, requests need <code>?token=…</code> or the <code>X-Popup-Token</code> header.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Remote</legend>
+      <label for="keyMode">Key source</label>
+      <select id="keyMode" name="keyMode">
+        <option value="auto">auto — read the remote directly when possible</option>
+        <option value="evas">evas — only keys the popup window receives</option>
+        <option value="evdev">evdev — read the remote, ignore the window</option>
+        <option value="grab">grab — read the remote and take it exclusively while the popup is up</option>
+      </select>
+      <div class="hint">If the remote does not reach the popup on your firmware, choose <b>evdev</b>.
+        Choose <b>grab</b> to stop the app behind the popup from also seeing the keys.</div>
+      <label for="homeKeyCode">Home key code that also dismisses</label>
+      <input id="homeKeyCode" name="homeKeyCode" type="number" min="0" max="767">
+      <div class="hint">Raw evdev code, or 0 for off. On Vetro's forwarded remote Home is often 63.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Callback</legend>
+      <label for="webhookUrl">Webhook URL</label>
+      <input id="webhookUrl" name="webhookUrl" type="text" placeholder="http://homeassistant.local:8123/api/webhook/xxxxxxxx">
+      <div class="hint">Every button press and every dismissal is POSTed here as JSON. Any HTTP endpoint will do; it is not Home Assistant-specific.</div>
+      <label class="check"><input id="emitDismiss" name="emitDismiss" type="checkbox"> Send an event when the popup closes</label>
+      <div class="row">
+        <div>
+          <label for="dismissEvent">Dismiss event name</label>
+          <input id="dismissEvent" name="dismissEvent" type="text" placeholder="dismiss">
+        </div>
+        <div>
+          <label for="dismissLabel">Dismiss button label</label>
+          <input id="dismissLabel" name="dismissLabel" type="text" placeholder="Dismiss">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Defaults</legend>
+      <div class="row">
+        <div>
+          <label for="defaultTimeout">Timeout (seconds, 0 = stay)</label>
+          <input id="defaultTimeout" name="defaultTimeout" type="number" min="0" max="3600">
+        </div>
+        <div>
+          <label for="defaultLocation">Location</label>
+          <select id="defaultLocation" name="defaultLocation">
+            <option value="tl">top-left</option>
+            <option value="tr">top-right</option>
+            <option value="bl">bottom-left</option>
+            <option value="br">bottom-right</option>
+            <option value="center">centre</option>
+          </select>
+        </div>
+      </div>
+      <label class="check"><input id="pauseMedia" name="pauseMedia" type="checkbox"> Pause media by default</label>
+      <label class="check"><input id="resumeMedia" name="resumeMedia" type="checkbox"> Resume when the popup closes</label>
+      <label for="pauseKey">Pause key (X keysym)</label>
+      <input id="pauseKey" name="pauseKey" type="text" placeholder="XF86AudioPlay">
+    </fieldset>
+
+    <button class="primary" type="submit">Save</button>
+    <div class="status" id="saveStatus"></div>
+  </form>
+
+  <fieldset>
+    <legend>Test</legend>
+    <label for="testMessage">Message</label>
+    <input id="testMessage" type="text" value="Someone is at the front door">
+    <label for="testImage">Image URL (optional)</label>
+    <input id="testImage" type="text" placeholder="https://…/snapshot.jpg">
+    <label for="testJson">Full payload (edits override the fields above)</label>
+    <textarea id="testJson">{
+  "message": "Someone is at the front door",
+  "title": "Doorbell",
+  "timeout": 60,
+  "sizeMultiplier": 1.0,
+  "pauseMedia": true,
+  "location": "tr",
+  "image": "",
+  "actions": [
+    { "label": "View live", "event": "popup_view", "context": { "camera": "front_door" } },
+    { "label": "Unlock", "event": "popup_unlock", "context": { "lock": "front_door" } }
+  ]
+}</textarea>
+    <button type="button" id="send">Show the popup</button>
+    <button type="button" id="solid">Test: solid overlay</button>
+    <div class="status" id="testStatus"></div>
+    <div class="hint">The solid overlay paints the whole screen for a few seconds. If it does not
+      appear, the TV is not letting the popup window draw on top, and that is the thing to fix.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Diagnostics</legend>
+    <p class="hint">Read from the TV: the Shard's state, the job it last handled, and both logs (the notifier's is the useful one).</p>
+    <button type="button" id="refreshLogs">Refresh</button>
+    <div class="status" id="logsStatus"></div>
+    <pre id="logs" style="max-height:420px;overflow:auto;white-space:pre-wrap;font-size:12px"></pre>
+  </fieldset>
+
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var FIELDS = ['port','bind','token','webhookUrl','emitDismiss','dismissEvent','dismissLabel','defaultTimeout','defaultLocation','pauseMedia','resumeMedia','pauseKey','keyMode','homeKeyCode'];
+
+  function get(name) { return fetch(name).then(function (r) { return r.json(); }); }
+  function post(name, body) {
+    return fetch(name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { code: r.status, body: j }; }); });
+  }
+
+  get('config').then(function (d) {
+    var c = d.config || {};
+    FIELDS.forEach(function (k) {
+      var el = $(k); if (!el) return;
+      if (el.type === 'checkbox') el.checked = c[k] === true;
+      else if (c[k] != null) el.value = c[k];
+    });
+  }).catch(function (e) { $('saveStatus').textContent = 'Could not load settings: ' + e.message; });
+
+  $('cfg').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var body = {};
+    FIELDS.forEach(function (k) {
+      var el = $(k); if (!el) return;
+      body[k] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    $('saveStatus').textContent = 'Saving…';
+    post('config', body).then(function (r) {
+      $('saveStatus').textContent = r.code === 200 ? 'Saved. The listener restarted on the new settings.' : ('Error: ' + (r.body.error || r.code));
+    }).catch(function (err) { $('saveStatus').textContent = 'Error: ' + err.message; });
+  });
+
+  $('send').addEventListener('click', function () {
+    var payload;
+    try { payload = JSON.parse($('testJson').value); }
+    catch (err) { return void ($('testStatus').textContent = 'Payload is not valid JSON: ' + err.message); }
+    if ($('testMessage').value) payload.message = $('testMessage').value;
+    payload.image = $('testImage').value || payload.image || null;
+    $('testStatus').textContent = 'Sending…';
+    post('test', payload).then(function (r) {
+      $('testStatus').textContent = r.code === 200 ? 'Sent.' : ('Error: ' + (r.body.error || r.code));
+    }).catch(function (err) { $('testStatus').textContent = 'Error: ' + err.message; });
+  });
+
+  function renderLogs() {
+    $('logsStatus').textContent = 'Loading…';
+    get('logs').then(function (d) {
+      $('logsStatus').textContent = '';
+      var out = [
+        'state:  ' + JSON.stringify(d.status),
+        'config: ' + JSON.stringify(d.config),
+        'dll:    ' + JSON.stringify(d.dll),
+        '',
+        'job:    ' + (d.job ? JSON.stringify(d.job) : '(none)'),
+        '',
+        '--- notifier.log ---',
+        (d.notifier || []).join('\n'),
+        '',
+        '--- popup.log ---',
+        (d.shard || []).join('\n')
+      ];
+      $('logs').textContent = out.join('\n');
+    }).catch(function (err) { $('logsStatus').textContent = 'Error: ' + err.message; });
+  }
+  $('refreshLogs').addEventListener('click', renderLogs);
+
+  $('solid').addEventListener('click', function () {
+    $('testStatus').textContent = 'Sending…';
+    post('debug', { mode: 'solid' }).then(function (r) {
+      $('testStatus').textContent = r.code === 200 ? 'Sent.' : ('Error: ' + (r.body.error || r.code));
+    }).catch(function (err) { $('testStatus').textContent = 'Error: ' + err.message; });
+  });
+</script>
+</body>
+</html>

@@ -26,6 +26,30 @@ window.LAUNCHER_CONFIG = {
         { id: 'kIciSQlYEM.plex', label: 'Plex', brand: 'plex' }
     ],
 
+    /*
+     * Apps that only Samsung's Smart Hub is allowed to open. BBC iPlayer is one: it is a ~45 KB
+     * "hybrid" shell, and a plain tizen.application.launch of it is accepted and then silently
+     * bounces you to Smart Hub (no error to catch, so the tile looks like it did nothing). Apps
+     * listed here are opened through the bundled launch helper instead (js/launch-helper.js and
+     * service/index.js), over the TV's own developer connection.
+     *
+     * This needs Developer Mode ON, with Host PC IP set to THIS TV's own address or to 127.0.0.1:
+     * the TV's sdbd accepts a connection only from the address Developer Mode names. While it is
+     * set that way the computer's `sdb` cannot reach the TV; set it back to use the native tools. If Vetro is on the TV it shares an SDB proxy on 127.0.0.1:26201, which the helper tries too (after sdbd directly), needing no Host PC IP change.
+     *
+     * The service will only ever run `was_execute` for the ids listed here (kept in step in
+     * service/index.js -> ALLOWED), so nothing else can be opened through it.
+     */
+    helper: {
+        url: 'http://127.0.0.1:8078',
+        // Normally empty: the page finds this TV's own address itself (systeminfo) and the helper
+        // tries it alongside loopback. Pin an address here to skip that and test a fixed one.
+        hosts: [],
+        apps: [
+            'DqEoaplKlw.bbchybrid'          // BBC iPlayer
+        ]
+    },
+
     inputs: [
         { hdmi: 1, label: 'Nintendo Switch', brand: 'switch' },
         { hdmi: 3, label: 'PlayStation 5', brand: 'playstation' }

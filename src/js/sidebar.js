@@ -402,6 +402,9 @@
     }
 
     function alignApps() {
+        // A hidden page reports collapsed geometry; aligning from that would move the apps block (and
+        // the consoles under it) and leave it there. Re-aligned on becoming visible instead.
+        if (document.hidden) return;
         if (!window.Home || !Home.setAppsTop) return;
         var col = $('sidebar'), stage = $('stage');
         var card = col && col.querySelector('.ha-head, .ha-card:not(.ha-clock)');
@@ -542,6 +545,14 @@
     function init() {
         var home = $('home'); if (!home) return;
         if (!$('sidebar')) { var aside = el('aside'); aside.id = 'sidebar'; home.insertBefore(aside, home.firstChild); }
+
+        // Becoming visible again: a hidden page cannot be measured, so re-align, and re-render if the
+        // sidebar's structure changed while it was away.
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden || !online) return;
+            if (structSig() !== lastSig) render();
+            else alignApps();
+        });
 
         setInterval(function () { if (online && structSig() !== lastSig) render(); }, 30000);  // day/night flip
         setInterval(refreshCameras, 4000);

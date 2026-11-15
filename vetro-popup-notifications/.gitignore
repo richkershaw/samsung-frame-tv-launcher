@@ -1,0 +1,15 @@
+# Native build output (the packed, text-only copy lives in popup-notifications/notify.dll.gz.b64)
+native/bin/
+native/obj/
+
+# Runtime work files written on the TV
+popup-notifications/media/
+popup-notifications/job.json
+popup-notifications/popup.log
+popup-notifications/notifier.fifo
+popup-notifications/notifier.pid
+popup-notifications/notifier.log
+popup-notifications/notify.dll
+
+# Local device details
+device.local.json

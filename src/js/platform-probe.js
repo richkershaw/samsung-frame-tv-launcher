@@ -26,7 +26,7 @@
     var log = DevLog.log;
 
     // Native bindings do not always enumerate, so known names are probed by hand as well.
-    var TIZEN_NAMES = ['power', 'application', 'systeminfo', 'tvwindow', 'tvinputdevice',
+    var TIZEN_NAMES = ['power', 'socket', 'application', 'systeminfo', 'tvwindow', 'tvinputdevice',
         'tvaudiocontrol', 'tvdisplaycontrol', 'tvchannel', 'tvinfo', 'productinfo', 'filesystem',
         'preference', 'time', 'websetting'];
 
@@ -91,6 +91,9 @@
         } else {
             describe('tizen', window.tizen, TIZEN_NAMES);
             describeMembers('tizen.power', window.tizen.power);
+            // The raw TCP/UDP socket API, if this engine has it. Probing the members too because a
+            // present-but-empty tizen.socket is not the same answer as an absent one.
+            describeMembers('tizen.socket', window.tizen.socket);
             if (window.tizen.power && typeof window.tizen.power.isScreenOn === 'function') {
                 try {
                     log('  tizen.power.isScreenOn() -> ' + window.tizen.power.isScreenOn());

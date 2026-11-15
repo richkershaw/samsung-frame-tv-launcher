@@ -11,7 +11,10 @@ node scripts/build-marks.mjs
 
 mkdir -p dist
 rm -f dist/arn0-launcher.wgt
+# Debug/ and .tizen-rds/ are Tizen Studio's own build output (gitignored). They are not part of
+# the app and would otherwise ship a stale full copy of it plus a nested multi-MB .wgt.
 (cd src && zip -q -r -X ../dist/arn0-launcher.wgt . -x '*.DS_Store' -x '.*' -x 'img/marks/*' \
+  -x 'Debug/*' -x '.tizen-rds/*' \
   -x 'img/easter-egg/*.jpg' -x 'img/easter-egg/runner.png' -x 'img/easter-egg/obstacle.png' \
   -x 'img/easter-egg/obstacle-face.png')
 

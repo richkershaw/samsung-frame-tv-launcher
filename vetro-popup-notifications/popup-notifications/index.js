@@ -439,7 +439,8 @@ module.exports = function (ctx) {
         var req = mod.request({ hostname: target.hostname, port: target.port, path: target.path, method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Content-Length': data.length } }, function (res) {
             res.resume();
-            if (res.statusCode >= 300) { log('webhook: HTTP ' + res.statusCode); return cb('webhook returned HTTP ' + res.statusCode); }
+            if (res.statusCode >= 300) { log('webhook: HTTP ' + res.statusCode + ' for ' + payload.event); return cb('webhook returned HTTP ' + res.statusCode); }
+            log('event ' + payload.event + ' -> ' + (target.hostname || 'webhook') + ' (' + res.statusCode + ')');
             cb(null);
         });
         req.on('error', function (e) { log('webhook: ' + e.message); cb(e.message); });
@@ -476,7 +477,8 @@ module.exports = function (ctx) {
         res.end(body);
     }
 
-    function handle(req, res, cfg) {
+    function handle(req, res) {
+        var cfg = config();   // read per request: a webhook set on the page must take effect at once
         var route = ((req.url || '').split('?')[0] || '/').replace(/\/+$/, '') || '/';
         if (!authorised(req, cfg)) return sendJson(res, 401, { error: 'unauthorised' });
 
@@ -513,9 +515,14 @@ module.exports = function (ctx) {
         sendJson(res, 404, { error: 'not found' });
     }
 
-    function openServer(cfg, cb) {
+    // The Shard's own listener (the /notify port). The port and bind are read when it opens,
+    // because changing those needs a rebind, but each request reads the rest of the config
+    // afresh — so a webhook saved on the page is used immediately rather than only after the
+    // listener happens to restart.
+    function openServer(cb) {
+        var cfg = config();
         try { server = http.createServer(function (req, res) {
-            try { handle(req, res, cfg); }
+            try { handle(req, res); }
             catch (e) { log('serve: ' + e.message); try { sendJson(res, 500, { error: 'internal' }); } catch (e2) { /* gone */ } }
         }); } catch (e) { return cb(e); }
         server.on('error', function (e) { detail.listening = false; cb(e); });
@@ -623,7 +630,7 @@ module.exports = function (ctx) {
                 try { ctx.config.set(stored); }
                 catch (e) { return sendJson(res, 500, { error: e.message }); }
                 var cfg = config();
-                restartServer(cfg);
+                restartServer();
                 restartNotifier();
                 sendJson(res, 200, { ok: true, config: cfg });
             });
@@ -643,9 +650,9 @@ module.exports = function (ctx) {
         return false;
     }
 
-    function restartServer(cfg) {
+    function restartServer() {
         closeServer();
-        openServer(cfg, function (e) { if (e) { log('listen: ' + e.message); detail.error = e.message; } });
+        openServer(function (e) { if (e) { log('listen: ' + e.message); detail.error = e.message; } });
     }
 
     // ------------------------------------------------------------------ lifecycle
@@ -657,7 +664,7 @@ module.exports = function (ctx) {
             generation++;
             var cfg = config();
             detail.lastResult = 'starting';
-            restartServer(cfg);
+            restartServer();
             check(cfg);
             timer = setInterval(function () { check(config()); }, TICK_MS);
             if (timer.unref) timer.unref();

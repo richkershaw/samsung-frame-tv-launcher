@@ -2,7 +2,7 @@
   "id": "popup-notifications",
   "apiVersion": 1,
   "name": "Popup notifications",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Draw a popup over the running app from any HTTP caller: a message, an optional snapshot and up to four buttons that POST back to a webhook. Needs root.",
   "author": "Rich Kershaw",
   "permissions": ["exec"],

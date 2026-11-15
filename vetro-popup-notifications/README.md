@@ -129,13 +129,17 @@ rest_command:
 
 `entity_picture` is a short-lived signed URL, so no token is needed in the payload.
 
-**Act on a button** — one webhook for every popup, branched on `trigger.json.event`:
+**Act on a button** — a second, independent automation. It receives the webhook the Shard
+posts to and branches on the event name. `webhook_id` is any string you choose; Home Assistant
+then exposes it at `http://<ha>/api/webhook/<webhook_id>`, which is what you put in the Shard's
+`webhookUrl` setting. The automation must exist and be loaded for that URL to answer.
 
 ```yaml
+# automations.yaml  (both this and the entry above go in the same list)
 - alias: TV popup → act
   triggers:
     - trigger: webhook
-      webhook_id: "tv-popups"          # matches the Shard's webhookUrl
+      webhook_id: "tv-popups"          # the <webhook_id> in the Shard's webhookUrl
       allowed_methods: [POST]
       local_only: true
   actions:
@@ -150,11 +154,22 @@ rest_command:
               target: { entity_id: "{{ trigger.json.context.camera }}" }
 ```
 
+Both `automations.yaml` snippets above are entries in one list: paste them under the existing
+`- alias:` lines, not inside each other. In the UI, **Settings → Automations → Create → Edit in
+YAML** takes a single automation *without* the leading `- ` — that dash is what makes it a list
+item in the file, and while useful when pasting into the file it is the thing that makes these
+blocks look like fragments out of context.
+
 **Or use the blueprint**: copy
 [`blueprints/automation/popup_notifications/popup_notification.yaml`](blueprints/automation/popup_notifications/popup_notification.yaml)
 to `config/blueprints/automation/popup_notifications/`, reload automations, and pick
-**TV popup notification**. It fills in the JSON for you (message, camera, position, one
-button). It assumes a `rest_command.tv_popup` exists, as above.
+**TV popup notification**. It fires on an **event entity** (domain `event` — a doorbell, a
+button): choose the entity and the **event type** it reports (e.g. `ring`), then the message,
+camera, position and one button. It assumes a `rest_command.tv_popup` exists, as above.
+
+The hand-written example above uses a state trigger on a `binary_sensor`; if your doorbell is
+an event entity instead, that is the trigger the blueprint uses — `trigger: event.received`
+with a `target` entity and an `event_type` option.
 
 ## Remote keys
 

@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 internal static class Query
 {
-    private const string TargetApp = "Arn0Lnchr0.Launcher";
+    private const string TargetApp = "LKLauncher.Launcher";
     private static readonly string[] Keys = {
         "db/appfw/home_appid",
         "db/appfw/startup_appid",

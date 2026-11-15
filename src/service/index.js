@@ -299,7 +299,7 @@ function handle(req, res) {
     if (req.method === 'GET' && path === '/ping') {
         var names = [];
         Object.keys(ALLOWED).forEach(function (id) { names.push(id); });
-        return reply(res, 200, { ok: true, service: 'arn0-launch-helper', allowed: names, busy: busy, last: last });
+        return reply(res, 200, { ok: true, service: 'lk-launch-helper', allowed: names, busy: busy, last: last });
     }
 
     if (req.method === 'POST' && path === '/launch') {
@@ -312,12 +312,12 @@ function handle(req, res) {
             if (busy) return reply(res, 409, { ok: false, error: 'another launch is running' });
             busy = true;
             var extra = [].concat(body.hosts || [], body.host || []);
-            console.log('[arn0-helper] was_execute ' + id + ' — targets ' + describeTargets(extra));
+            console.log('[lk-helper] was_execute ' + id + ' — targets ' + describeTargets(extra));
             wasExecute(id, extra, function (err, out, host) {
                 busy = false;
                 if (err) {
                     var reason = String(err.message || err);
-                    console.log('[arn0-helper] failed: ' + reason);
+                    console.log('[lk-helper] failed: ' + reason);
                     last = { at: Date.now(), id: id, ok: false, error: reason };
                     return reply(res, 500, { ok: false, error: reason });
                 }
@@ -332,13 +332,13 @@ function handle(req, res) {
 }
 
 module.exports.onStart = function () {
-    console.log('[arn0-helper] starting on ' + HOST + ':' + PORT);
+    console.log('[lk-helper] starting on ' + HOST + ':' + PORT);
     server = http.createServer(handle);
     server.on('error', function (err) {
-        console.log('[arn0-helper] server error: ' + (err.message || err));
+        console.log('[lk-helper] server error: ' + (err.message || err));
     });
     server.listen(PORT, HOST, function () {
-        console.log('[arn0-helper] listening');
+        console.log('[lk-helper] listening');
     });
 };
 

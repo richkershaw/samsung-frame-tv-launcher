@@ -6,8 +6,8 @@ using System.Text.Json;
 
 internal static class Control
 {
-    private const string Target = "Arn0Lnchr0.Launcher";
-    private const string TargetPackage = "Arn0Lnchr0";
+    private const string Target = "LKLauncher.Launcher";
+    private const string TargetPackage = "LKLauncher";
     private const string MainOperation = "http://tizen.org/appcontrol/operation/main";
     private const string AutoKey = "db/menu/smart_hub/ontvsetting/auto_start";
     private const string HomeKey = "db/appfw/home_appid";
@@ -148,7 +148,7 @@ internal static class Control
             Guard();
             if (args.Length == 1 && args[0] == "query")
             {
-                Console.WriteLine("ARN0_QUERY=" + JsonSerializer.Serialize(Query()));
+                Console.WriteLine("LK_QUERY=" + JsonSerializer.Serialize(Query()));
                 return 0;
             }
             if (args.Length != 2 || (args[0] != "apply" && args[0] != "restore" && args[0] != "verify"))
@@ -158,14 +158,14 @@ internal static class Control
             if (args[0] == "verify")
             {
                 RequireOriginal(before, original);
-                Console.WriteLine("ARN0_BASELINE_MATCH=" + JsonSerializer.Serialize(before));
+                Console.WriteLine("LK_BASELINE_MATCH=" + JsonSerializer.Serialize(before));
                 return 0;
             }
             if (args[0] == "restore")
             {
                 RequireRestorable(before, original);
                 Restore(original);
-                Console.WriteLine("ARN0_RESTORED=" + JsonSerializer.Serialize(Query()));
+                Console.WriteLine("LK_RESTORED=" + JsonSerializer.Serialize(Query()));
                 return 0;
             }
 
@@ -184,7 +184,7 @@ internal static class Control
                 if (after.Home != Target || after.Strings[HomeKey] != Target ||
                     after.Autostart != original.Autostart)
                     throw new Exception("Applied values failed verification");
-                Console.WriteLine("ARN0_APPLIED=" + JsonSerializer.Serialize(after));
+                Console.WriteLine("LK_APPLIED=" + JsonSerializer.Serialize(after));
                 return 0;
             }
             catch
@@ -203,7 +203,7 @@ internal static class Control
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("ARN0_ABORTED=" + ex);
+            Console.Error.WriteLine("LK_ABORTED=" + ex);
             return 1;
         }
     }

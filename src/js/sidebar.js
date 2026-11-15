@@ -4,8 +4,9 @@
  * Source of truth is the Lovelace dashboard named in config.homeAssistant.sidebar. js/ha.js reads
  * its config (ordered cards + visibility) and streams live state; this file turns that into
  * TV-native tiles, evaluates visibility against live state and the clock, drives actions, and
- * keeps the clock alive. HA unreachable -> the column hides and the normal clock-over-tiles home
- * shows through.
+ * keeps the clock alive — the column carries the only clock on Home. It is always on screen, so
+ * nothing shifts when the dashboard arrives. Until the config and first states arrive the dashboard
+ * area is blank; if HA later drops, the last-known cards stay put, dimmed (.ha-offline).
  *
  * Structure: the clock is pinned; the cards below live in a scrolling track. State updates patch
  * the affected card in place (so a focused tile never loses its highlight or re-animates). Camera
@@ -334,36 +335,54 @@
     function buildCard(card) { return (RENDER[card.kind] || renderSensor)(card); }
 
     // ---- clock ----
+    // The time and its AM/PM suffix are separate spans so the suffix can be set smaller, as the old
+    // Home clock did (in 24-hour mode the suffix is empty).
     function tickClock() {
         var col = $('sidebar'); if (!col) return;
-        var t = col.querySelector('.ha-clock-time'); if (!t) return;
+        var t = col.querySelector('.ha-clock-hhmm'); if (!t) return;
         var now = new Date(), ct = Appearance.time(now);
-        t.textContent = ct.time + (ct.suffix || '');
+        t.textContent = ct.time;
+        var s = col.querySelector('.ha-clock-suffix'); if (s) s.textContent = ct.suffix || '';
         var d = col.querySelector('.ha-clock-date'); if (d) d.textContent = Appearance.date(now);
     }
-    function clockCard() { var b = el('div', 'ha-card ha-clock'); b.appendChild(el('div', 'ha-clock-time')); b.appendChild(el('div', 'ha-clock-date')); return b; }
+    function clockCard() {
+        var b = el('div', 'ha-card ha-clock');
+        var t = el('div', 'ha-clock-time');
+        t.appendChild(el('span', 'ha-clock-hhmm'));
+        t.appendChild(el('span', 'ha-clock-suffix'));
+        b.appendChild(t);
+        b.appendChild(el('div', 'ha-clock-date'));
+        return b;
+    }
 
     // ---- full render (structure) ----
+    // Always draws the column, with the clock at the top. The dashboard is drawn once a config and a
+    // first state snapshot have arrived, and then kept on screen through an HA outage (dimmed via
+    // .ha-offline) rather than flickering away — an unreachable HA never hides the column, so the app
+    // and console rows never shift sideways.
     function render() {
-        var col = $('sidebar'); if (!col || !online) return;
+        var col = $('sidebar'); if (!col) return;
         camImgs = []; cardEls = {};
         col.innerHTML = '';
         col.appendChild(clockCard());
         var scroll = el('div', 'ha-scroll'), track = el('div', 'ha-track');
         scroll.appendChild(track); col.appendChild(scroll);
-        var np = activeMedia();
-        if (np) {
-            var mbox = buildCard({ kind: 'media', entity: np, name: 'Now Playing' });
-            track.appendChild(mbox);
-            (cardEls[np] = cardEls[np] || []).push(mbox);
+        if (haveConfig && haveStates) {
+            var np = activeMedia();
+            if (np) {
+                var mbox = buildCard({ kind: 'media', entity: np, name: 'Now Playing' });
+                track.appendChild(mbox);
+                (cardEls[np] = cardEls[np] || []).push(mbox);
+            }
+            cards.forEach(function (card) {
+                if (card.kind !== 'heading' && !card.entity) return;
+                if (!visible(card)) return;
+                var box = buildCard(card);
+                track.appendChild(box);
+                if (card.entity) (cardEls[card.entity] = cardEls[card.entity] || []).push(box);
+            });
         }
-        cards.forEach(function (card) {
-            if (card.kind !== 'heading' && !card.entity) return;
-            if (!visible(card)) return;
-            var box = buildCard(card);
-            track.appendChild(box);
-            if (card.entity) (cardEls[card.entity] = cardEls[card.entity] || []).push(box);
-        });
+        col.classList.toggle('ha-offline', !online);
         lastSig = structSig();
         tickClock();
         alignApps();
@@ -402,9 +421,11 @@
     }
 
     function alignApps() {
-        // A hidden page reports collapsed geometry; aligning from that would move the apps block (and
-        // the consoles under it) and leave it there. Re-aligned on becoming visible instead.
+        // Never measure while Home is off screen: a hidden view reports collapsed geometry, and
+        // aligning from that would drop the shelves to the top and leave them there. Home calls
+        // realignApps from its onShow when it comes back.
         if (document.hidden) return;
+        if (!UI.isVisible('home')) return;
         if (!window.Home || !Home.setAppsTop) return;
         var col = $('sidebar'), stage = $('stage');
         var card = col && col.querySelector('.ha-head, .ha-card:not(.ha-clock)');
@@ -530,11 +551,16 @@
     // ---- online/offline ----
     function applyMode() {
         var home = $('home'), col = $('sidebar');
-        if (home) home.classList.toggle('has-sidebar', online);
-        if (col) col.style.display = online ? '' : 'none';
-        if (online) render();
-        else {
-            if (window.Home && Home.setAppsTop) Home.setAppsTop(null);
+        // The column is always on screen, so the app and console rows never shift sideways when HA
+        // is slow or unreachable.
+        if (home) home.classList.add('has-sidebar');
+        if (col) col.style.display = '';
+        // Draw when we have something new to draw (first time — the clock — or HA is back). An
+        // outage only fades what is already on screen, so a blip never rebuilds the cards: no
+        // scroll jump, and the camera card does not blank and reload.
+        if (online || !col || !col.querySelector('.ha-clock')) render();
+        else col.classList.add('ha-offline');
+        if (!online) {
             if (window.Home && Home.sidebarGone) Home.sidebarGone();
             closeCamera();
         }
@@ -549,7 +575,7 @@
         // Becoming visible again: a hidden page cannot be measured, so re-align, and re-render if the
         // sidebar's structure changed while it was away.
         document.addEventListener('visibilitychange', function () {
-            if (document.hidden || !online) return;
+            if (document.hidden) return;
             if (structSig() !== lastSig) render();
             else alignApps();
         });
@@ -557,6 +583,10 @@
         setInterval(function () { if (online && structSig() !== lastSig) render(); }, 30000);  // day/night flip
         setInterval(refreshCameras, 4000);
         setInterval(tickClock, 10000);
+
+        // Show the column (clock only) straight away, before HA has answered, so nothing on Home
+        // shifts sideways once the dashboard arrives.
+        applyMode();
 
         if (configured()) {
             HA.connect({
@@ -571,11 +601,16 @@
         cards = normalise(MOCK_CONFIG); states = MOCK_STATES;
         haveConfig = haveStates = true;
         setOnline(!down);
+        // setOnline(true) has already drawn; going straight to offline above is a no-op, so the
+        // mock's (dimmed) dashboard needs one draw to appear.
+        if (!online) render();
     }
 
     window.Sidebar = {
         init: init,
         setOffline: function (off) { setOnline(!off); },
+        realignApps: alignApps,
+        refreshClock: tickClock,
         rows: function () { var t = $('sidebar') && $('sidebar').querySelector('.ha-track'); return t ? UI.children(t).filter(function (c) { return c.classList.contains('ha-focusable'); }) : []; },
         ensureVisible: ensureVisible,
         activate: activate,

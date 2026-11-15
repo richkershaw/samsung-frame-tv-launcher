@@ -2,7 +2,7 @@
 (function () {
     'use strict';
 
-    var CACHE_KEY = 'arn0.apps.v1';
+    var CACHE_KEY = 'lk.apps.v1';
     var REFRESH_AFTER_MS = 5 * 60 * 1000;
     var GRID_COLS = 5;
 
@@ -180,24 +180,15 @@
             if (!input.hidden) row2.appendChild(inputTile(input));
         });
         $('inputs-section').classList.toggle('hidden', !row2.children.length);
-        positionConsoles();
         applyInputStatus();
         if (UI.isVisible('home')) UI.refresh();
     }
 
-    // Consoles sit just below the wrapped apps block, whatever height it is. Never measured while the
-    // page is hidden: a backgrounded Tizen page reports collapsed geometry, so a console top worked
-    // out from it sticks until the next layout change. Guarded here and re-run on becoming visible.
-    function positionConsoles() {
-        if (document.hidden) return;
-        var appsSec = $('apps-section');
-        $('inputs-section').style.top = (appsSec.offsetTop + appsSec.offsetHeight + 30) + 'px';
-    }
-
-    // Lets the sidebar line the apps row up with its first card; null restores the CSS default.
+    // Lets the sidebar line the app row up with its first card; null restores the CSS default. Only
+    // the block's own top is set — the consoles below sit in normal flow, so they follow whatever
+    // height the apps wrap to without anything being measured.
     function setAppsTop(px) {
-        $('apps-section').style.top = (px == null ? '' : px + 'px');
-        positionConsoles();
+        $('shelves').style.top = (px == null ? '' : px + 'px');
     }
 
     function applyInputStatus() {
@@ -362,15 +353,7 @@
         return true;
     }
 
-    // ---------- Clock, data, lifecycle
-
-    function updateClock() {
-        var d = new Date();
-        var t = Appearance.time(d);
-        $('time-main').textContent = t.time;
-        $('time-suffix').textContent = t.suffix;
-        $('date').textContent = Appearance.date(d);
-    }
+    // ---------- Data, lifecycle
 
     // The TV takes ~4 s to list its ~450 apps, so Home is drawn from the last list we saw
     // and only redrawn if a fresh list differs.
@@ -498,6 +481,9 @@
         UI.register('home', {
             el: $('home'),
             startRow: 1,
+            // Coming back to Home, re-line the shelves up with the sidebar's first card. The sidebar
+            // cannot measure them while Home is hidden, so it leaves the alignment for here.
+            onShow: function () { if (window.Sidebar && Sidebar.realignApps) Sidebar.realignApps(); },
             hints: function () {
                 if (sbState.camOpen) return [['Back', 'Close']];
                 if (!sbState.active) return [['OK', 'Open'], ['▲', 'Settings']];
@@ -559,8 +545,6 @@
             return false;
         });
         Appearance.apply();
-        updateClock();
-        setInterval(updateClock, 10000);
         renderLab();
         var cached = readCache();
         if (cached && cached.length) setApps(cached);
@@ -574,9 +558,7 @@
                 if (state.tvMode) exitTvMode();
                 return;
             }
-            updateClock();
             refreshInputStatus();
-            positionConsoles();
             // Back on the launcher's own screen (an app was closed, or we returned from a viewer).
             if (window.MQTT && !state.tvMode) MQTT.reportHome();
             if (UI.isVisible('home')) Wallpaper.homeShown();
@@ -600,7 +582,6 @@
         tvMode: function () { return state.tvMode; },
         refreshInputStatus: refreshInputStatus,
         renderLab: renderLab,
-        updateClock: updateClock,
         reloadApps: loadApps,
         setAppsTop: setAppsTop,
         reSidebarFocus: function () { if (sbState.active) sbHighlight(); },

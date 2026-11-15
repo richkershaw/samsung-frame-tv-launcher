@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the two guarded native helpers (native/*.csproj) into native/build/.
-# These run on the TV; they are NOT part of dist/arn0-launcher.wgt.
+# These run on the TV; they are NOT part of dist/lk-launcher.wgt.
 #
 # Needs a .NET SDK: https://dotnet.microsoft.com/download
 # The projects target netcoreapp3.1, whose targeting pack recent SDKs no longer
@@ -22,6 +22,6 @@ for project in Query Control; do
 done
 
 echo "Built native helpers into native/build:"
-ls -l native/build/Arn0HomeQuery.* native/build/Arn0HomeControl.* 2>/dev/null || true
+ls -l native/build/LKHomeQuery.* native/build/LKHomeControl.* 2>/dev/null || true
 echo
 echo "Next: npm run native:inspect   (needs device.local.json, see scripts/native-home/README.md)"

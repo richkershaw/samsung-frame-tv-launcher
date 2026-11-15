@@ -105,47 +105,25 @@ h1, h2 {
 
 /* ---------- Home ---------- */
 
-.clock {
-    position: absolute;
-    top: 88px;
-    left: var(--edge);
-}
-
-#time {
-    font-size: 132px;
-    font-weight: 300;
-    letter-spacing: -3px;
-    line-height: 1;
-}
-
-#time-suffix {
-    margin-left: 14px;
-    font-size: 44px;
-    font-weight: 400;
-    letter-spacing: 0;
-}
-
-#date {
-    margin-top: 14px;
-    font-size: 34px;
-    font-weight: 500;
-    color: var(--muted);
-}
-
-/* Appearance options */
-.no-date #date { display: none; }
+/* Appearance options. The clock lives in the sidebar column (see #sidebar); it is the only one. */
+.no-date .ha-clock-date { display: none; }
 .names-never .app .label,
 .names-focused .app .label { visibility: hidden; }
 .names-focused .app.focused .label { visibility: visible; }
 
-.shelf {
+/* Apps and consoles stack in normal flow, so a taller (wrapped) app row simply pushes the consoles
+   down — their offset is layout's job, never a measurement that can be taken while Home is hidden.
+   Only the block's top is set from JS, so the sidebar can line the app row up with its first card. */
+.shelves {
     position: absolute;
+    top: 350px;
     left: var(--edge);
     right: 0;
+    display: flex;
+    flex-direction: column;
 }
 
-#apps-section { top: 350px; }
-#inputs-section { top: 624px; }
+#inputs-section { margin-top: 30px; }
 
 .shelf h2 {
     margin-bottom: 26px;
@@ -970,14 +948,19 @@ html.preview, html.preview body {
 }
 
 /* Darkens the left of the screen, where the clock and dashboard sit, fading out toward the right,
-   so both read clearly over a bright wallpaper. */
+   so both read clearly over a bright wallpaper. Weighted to stay strong across the whole 540px
+   column (~28% of the width) rather than dropping off early, so busy photos do not wash it out. */
 .ss-leftshade {
     position: absolute;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 62%;
-    background: linear-gradient(to right, rgba(5, 6, 10, 0.72) 0%, rgba(5, 6, 10, 0.42) 32%, rgba(5, 6, 10, 0) 100%);
+    width: 64%;
+    background: linear-gradient(to right,
+        rgba(5, 6, 10, 0.94) 0%,
+        rgba(5, 6, 10, 0.78) 32%,
+        rgba(5, 6, 10, 0.42) 62%,
+        rgba(5, 6, 10, 0) 100%);
     pointer-events: none;
 }
 
@@ -1121,11 +1104,8 @@ html.preview, html.preview body {
     pointer-events: none;
 }
 
-/* Shift the main home content right of the column, and hide the original clock
-   (the sidebar carries its own). */
-#home.has-sidebar .clock { display: none; }
-#home.has-sidebar #apps-section,
-#home.has-sidebar #inputs-section { left: 600px; }
+/* Shift the main home content right of the column. */
+#home.has-sidebar .shelves { left: 600px; }
 #home.has-sidebar .row-viewport { width: 1200px; }
 
 .ha-banner {
@@ -1136,9 +1116,9 @@ html.preview, html.preview body {
     padding: 12px 18px;
     border-radius: 12px;
 }
-#sidebar.ha-offline .ha-value:not(.muted),
-#sidebar.ha-offline .ha-pill,
-#sidebar.ha-offline .ha-stepper .ha-value { opacity: 0.4; }
+/* HA unreachable: the last-known dashboard stays put rather than flickering away, and dims so it
+   does not read as live. The clock above it stays at full strength — it is local, not HA's. */
+#sidebar.ha-offline .ha-scroll { opacity: 0.4; }
 
 .ha-card {
     flex: none;
@@ -1204,6 +1184,7 @@ html.preview, html.preview body {
 .ha-sub { margin-top: 3px; font-size: 17px; color: var(--muted); }
 
 .ha-clock-time { font-size: 112px; font-weight: 300; letter-spacing: -3px; line-height: 1; }
+.ha-clock-suffix { margin-left: 12px; font-size: 38px; font-weight: 400; letter-spacing: 0; }
 .ha-clock-date { margin-top: 12px; font-size: 32px; font-weight: 500; color: var(--muted); }
 
 .ha-pill {
@@ -1270,7 +1251,7 @@ html.preview, html.preview body {
 
 
 /* Cards scroll below the pinned clock. */
-.ha-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.ha-scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; transition: opacity 0.3s ease-out; }
 .ha-track { display: flex; flex-direction: column; gap: 11px; padding: 8px 10px; box-sizing: border-box; transition: transform 0.18s ease-out; will-change: transform; }
 
 /* Camera pop-over (OK on a camera tile). */

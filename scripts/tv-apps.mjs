@@ -28,7 +28,7 @@ const tokenFile = resolve(import.meta.dirname, '.tv-token');
 let token = '';
 try { token = readFileSync(tokenFile, 'utf8').trim(); } catch {}
 
-const name = Buffer.from('arn0-tv-apps').toString('base64');
+const name = Buffer.from('lk-tv-apps').toString('base64');
 const path = `/api/v2/channels/samsung.remote.control?name=${name}` + (token ? `&token=${token}` : '');
 
 function restStatus(id) {

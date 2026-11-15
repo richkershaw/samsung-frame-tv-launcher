@@ -222,7 +222,7 @@
         Prefs.get().appearance[item.key] = item.value;
         Prefs.save();
         Appearance.apply();
-        Home.updateClock();
+        if (window.Sidebar && Sidebar.refreshClock) Sidebar.refreshClock();
         renderAppearance();
         UI.refresh();
     }

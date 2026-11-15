@@ -5,8 +5,8 @@
 (function () {
     'use strict';
 
-    var KEY = 'arn0.prefs.v1';
-    var LEGACY_WALLPAPER_KEY = 'arn0.wallpaper';
+    var KEY = 'lk.prefs.v1';
+    var LEGACY_WALLPAPER_KEY = 'lk.wallpaper';
 
     function defaults() {
         var cfg = window.LAUNCHER_CONFIG || {};

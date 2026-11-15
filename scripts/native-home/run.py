@@ -31,8 +31,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-# inspect and query use the read-only Arn0HomeQuery assembly; the rest use
-# Arn0HomeControl. Keeping the two separate means the write-capable assembly is
+# inspect and query use the read-only LKHomeQuery assembly; the rest use
+# LKHomeControl. Keeping the two separate means the write-capable assembly is
 # only ever staged for a mode that has been through the gate below.
 MODES = ("inspect", "query", "verify", "apply", "restore")
 READ_ONLY_MODES = ("inspect", "query")
@@ -41,7 +41,7 @@ BASELINE_MODES = ("verify", "apply", "restore")
 DEFAULT_MODEL = "QE65LS03BAUXXU"
 DEFAULT_FIRMWARE = "T-PTMDEUC-1720.7"
 STAGE_DIR = "/home/owner/share/tmp/sdk_tools"
-REMOTE_BASELINE = STAGE_DIR + "/Arn0HomeOriginal.json"
+REMOTE_BASELINE = STAGE_DIR + "/LKHomeOriginal.json"
 
 # The reviewed transport: the whole `sdb shell` argument has to stay under 400
 # bytes, so the injected script is base64-encoded to keep it short and to avoid
@@ -64,12 +64,12 @@ CONFIG_PATH = HERE / "device.local.json"
 OUT_DIR = HERE / "out"
 
 ENV_MAP = {
-    "host": "ARN0_TV_IP",
-    "model": "ARN0_MODEL",
-    "firmware": "ARN0_FIRMWARE",
-    "sdb": "ARN0_SDB",
-    "dotnet": "ARN0_DOTNET",
-    "helper_dir": "ARN0_HELPER_DIR",
+    "host": "LK_TV_IP",
+    "model": "LK_MODEL",
+    "firmware": "LK_FIRMWARE",
+    "sdb": "LK_SDB",
+    "dotnet": "LK_DOTNET",
+    "helper_dir": "LK_HELPER_DIR",
 }
 
 
@@ -80,7 +80,7 @@ ENV_MAP = {
 
 def helper_name(mode: str) -> str:
     """The assembly a mode needs: the read-only query, or the write-capable control."""
-    return "Arn0HomeQuery" if mode in READ_ONLY_MODES else "Arn0HomeControl"
+    return "LKHomeQuery" if mode in READ_ONLY_MODES else "LKHomeControl"
 
 
 def helper_files(mode: str) -> list[str]:
@@ -92,17 +92,17 @@ def helper_files(mode: str) -> list[str]:
 def success_token(mode: str) -> str:
     """The string that proves the helper reached the end of what was asked of it."""
     return {
-        "inspect": "ARN0_INSPECT_END",
+        "inspect": "LK_INSPECT_END",
         "query": "QUERY_END",
-        "verify": "ARN0_BASELINE_MATCH=",
-        "apply": "ARN0_APPLIED=",
-        "restore": "ARN0_RESTORED=",
+        "verify": "LK_BASELINE_MATCH=",
+        "apply": "LK_APPLIED=",
+        "restore": "LK_RESTORED=",
     }[mode]
 
 
 def failure_tokens(mode: str) -> tuple[str, ...]:
     """The strings the helpers print on their stderr when a guard or a call fails."""
-    return ("QUERY_ABORTED=",) if mode == "query" else ("ARN0_ABORTED=",)
+    return ("QUERY_ABORTED=",) if mode == "query" else ("LK_ABORTED=",)
 
 
 def check_output(mode: str, text: str) -> tuple[bool, str]:
@@ -111,7 +111,7 @@ def check_output(mode: str, text: str) -> tuple[bool, str]:
     A missing end marker is treated as unknown state, not success: the script may
     have been cut off mid-write.
     """
-    if "ARN0_RUN_END" not in text:
+    if "LK_RUN_END" not in text:
         return False, (
             "the script did not reach its end marker; device state is unknown. "
             "Inspect the current values before retrying."
@@ -153,14 +153,14 @@ def baseline_shape_problems(data: object) -> list[str]:
 def apply_gate_problems(data: object) -> list[str]:
     """The one policy gate, and only for `apply`.
 
-    The reference TV had `auto_start = 1`; arn0's guide says to stop and research
+    The reference TV had `auto_start = 1`; lk's guide says to stop and research
     the `0` case before applying. `verify` and `restore` are deliberately *not*
     gated by this — restore is the way back and must always be available.
     """
     autostart = data.get("Autostart") if isinstance(data, dict) else None
     if autostart == 0:
         return [
-            "Autostart is 0. The reference TV had 1 and arn0's guide says to stop and "
+            "Autostart is 0. The reference TV had 1 and lk's guide says to stop and "
             "research this configuration before applying, and the S90D work this method "
             "comes from saw no foreground boot with auto_start 0. `apply` is refused; "
             "`verify` and `restore` still work."
@@ -196,7 +196,7 @@ def config_problems(cfg: dict) -> list[str]:
     except ValueError:
         problems.append(
             "host must be a plain IPv4/IPv6 address; set it in device.local.json "
-            "or ARN0_TV_IP (see device.local.example.json)"
+            "or LK_TV_IP (see device.local.example.json)"
         )
     if not str(cfg.get("sdb", "")).strip():
         problems.append("sdb path is empty")
@@ -277,12 +277,12 @@ def local_ip_for(host: str) -> str:
 
 def confirm_apply() -> bool:
     """An explicit, human confirmation before the one mode that writes."""
-    if os.environ.get("ARN0_CONFIRM_APPLY") == "1":
+    if os.environ.get("LK_CONFIRM_APPLY") == "1":
         return True
     if not sys.stdin.isatty():
         print(
             "apply: stdin is not a terminal, so nothing can be confirmed. "
-            "Set ARN0_CONFIRM_APPLY=1 to confirm non-interactively.",
+            "Set LK_CONFIRM_APPLY=1 to confirm non-interactively.",
             file=sys.stderr,
         )
         return False
@@ -310,7 +310,7 @@ def execute_on_tv(cfg: dict, mode: str, baseline_path: Path | None) -> str:
         run_sdb(cfg, ["-s", serial, "push", str(baseline_path), REMOTE_BASELINE])
 
     token = uuid.uuid4().hex[:12]
-    remote = STAGE_DIR + "/arn0-" + token + ".sh"
+    remote = STAGE_DIR + "/lk-" + token + ".sh"
     run_sdb(cfg, ["-s", serial, "push", str(HERE / (mode + ".sh")), remote])
 
     local_ip = local_ip_for(cfg["host"])

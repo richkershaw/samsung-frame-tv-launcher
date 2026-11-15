@@ -35,17 +35,17 @@ for the same foothold taken further.
 | Command | Writes? | What it does |
 | --- | --- | --- |
 | `npm run native:inspect` | no | environment probe: uid, arch, firmware, .NET runtime, current `vconftool` values, native libs |
-| `npm run native:query` | no | runs `Arn0HomeQuery`: Home operation, the five settings, `launcher_boot_supported` |
+| `npm run native:query` | no | runs `LKHomeQuery`: Home operation, the five settings, `launcher_boot_supported` |
 | `npm run native:verify -- <baseline.json>` | no | compares live values against the saved baseline |
 | `npm run native:apply -- <baseline.json>` | **yes** | redirects Home to the launcher (read-back + auto-rollback) |
 | `npm run native:restore -- <baseline.json>` | **yes** | restores the saved Home/startup values |
 | `npm run native:test` | no | unit-tests the runner's pure logic (no TV) |
 
 Pass a baseline path through npm with `--`, e.g.
-`npm run native:verify -- ~/arn0-frame-baseline.json`.
+`npm run native:verify -- ~/lk-frame-baseline.json`.
 
-`inspect` and `query` stage only the read-only `Arn0HomeQuery` assembly;
-`verify`, `apply` and `restore` stage the write-capable `Arn0HomeControl`. The
+`inspect` and `query` stage only the read-only `LKHomeQuery` assembly;
+`verify`, `apply` and `restore` stage the write-capable `LKHomeControl`. The
 two are never mixed.
 
 ## Order of operations
@@ -58,7 +58,7 @@ cp scripts/native-home/device.local.example.json scripts/native-home/device.loca
 $EDITOR scripts/native-home/device.local.json
 
 npm run native:inspect
-npm run native:query          # -> save the ARN0_QUERY / QUERY output as a baseline
+npm run native:query          # -> save the LK_QUERY / QUERY output as a baseline
                               #    off the TV, in Control.cs's snapshot shape
 npm run native:verify  -- <baseline.json>
 #   -> physical checks (see below)
@@ -95,7 +95,7 @@ recovery bundle (`npm run native:bundle`) deliberately does not include it.
   stage anything if it is not shaped the way `Control.cs` expects.
 - **`apply` refuses when the baseline's `Autostart` is `0`** — see below. This
   blocks `apply` only; `verify` and `restore` still work on such a baseline.
-- `apply` asks you to type `APPLY` (or set `ARN0_CONFIRM_APPLY=1` to confirm
+- `apply` asks you to type `APPLY` (or set `LK_CONFIRM_APPLY=1` to confirm
   non-interactively). No typing, no write.
 - The helpers themselves re-check 32-bit, uid=901 and the firmware string, read
   back every write, roll back a failed apply, and refuse `restore` on values
@@ -108,7 +108,7 @@ recovery bundle (`npm run native:bundle`) deliberately does not include it.
 
 `apply` writes the `main` app-control operation and `db/appfw/home_appid`, and
 writes `auto_start` back unchanged. On a Frame this interacts with Art Mode, and
-arn0 rated the Frame untested, so treat it as an experiment:
+lk rated the Frame untested, so treat it as an experiment:
 
 - **Not at risk:** the Art Mode app (`org.tizen.art-app`, artwork, mattes,
   brightness), and entering/leaving Art Mode with the Power key (a firmware
@@ -128,12 +128,12 @@ the runner will refuse it for you.
 
 | Field | Env | Default | Meaning |
 | --- | --- | --- | --- |
-| `host` | `ARN0_TV_IP` | — (required) | TV IP address |
-| `model` | `ARN0_MODEL` | `QE65LS03BAUXXU` | expected model, checked at `:8001` when the TV reports one |
-| `firmware` | `ARN0_FIRMWARE` | `T-PTMDEUC-1720.7` | expected firmware (the helper enforces this on the TV too) |
-| `sdb` | `ARN0_SDB` | `sdb` | path to Tizen Studio's `sdb` |
-| `dotnet` | `ARN0_DOTNET` | `/usr/bin/dotnet` | .NET host on the TV (baked into the `*.sh`; edit those if it differs) |
-| `helper_dir` | `ARN0_HELPER_DIR` | `native/build` | where the built assemblies live |
+| `host` | `LK_TV_IP` | — (required) | TV IP address |
+| `model` | `LK_MODEL` | `QE65LS03BAUXXU` | expected model, checked at `:8001` when the TV reports one |
+| `firmware` | `LK_FIRMWARE` | `T-PTMDEUC-1720.7` | expected firmware (the helper enforces this on the TV too) |
+| `sdb` | `LK_SDB` | `sdb` | path to Tizen Studio's `sdb` |
+| `dotnet` | `LK_DOTNET` | `/usr/bin/dotnet` | .NET host on the TV (baked into the `*.sh`; edit those if it differs) |
+| `helper_dir` | `LK_HELPER_DIR` | `native/build` | where the built assemblies live |
 
 ## Files
 

@@ -24,7 +24,7 @@
         try {
             return tizen.application.getCurrentApplication().appInfo.id.split('.')[0] + '.LaunchService';
         } catch (e) {
-            return 'Arn0Lnchr0.LaunchService';
+            return 'LKLauncher.LaunchService';
         }
     }
 

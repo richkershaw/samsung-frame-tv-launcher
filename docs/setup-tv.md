@@ -17,7 +17,7 @@ helper run elsewhere; the calls have not been validated on other hardware.
 | Model | QE65Q70BATXXC (Samsung Q70B, 2022) |
 | Firmware | T-PTMDEUC-1720.7 |
 | Platform | Tizen 6.5, armv7 / 32-bit |
-| Launcher app id | `Arn0Lnchr0.Launcher` |
+| Launcher app id | `LKLauncher.Launcher` |
 | Developer user | UID 901, no root |
 
 No compatibility claim for any other model, year or firmware. Tizen 7/8/9 TVs, The Frame, and
@@ -35,7 +35,7 @@ Prerequisites: Node.js 20+, and the TV in Developer Mode on the same network.
 1. Build the package:
 
    ```sh
-   npm run build          # -> dist/arn0-launcher.wgt
+   npm run build          # -> dist/lk-launcher.wgt
    ```
 
 2. Install it. Either Apps2Samsung's **Custom WGT File** option, or Tizen Studio's CLI. Use the
@@ -64,9 +64,9 @@ supported consumer API.
 
 Two small .NET console assemblies in [native/](../native/) do exactly that and nothing else:
 
-- **`Query.cs`** → `Arn0HomeQuery`. Read-only. Prints the current values and exits. It cannot
+- **`Query.cs`** → `LKHomeQuery`. Read-only. Prints the current values and exits. It cannot
   write anything; there is no write call in the file.
-- **`Control.cs`** → `Arn0HomeControl`. Takes `query`, `verify`, `apply` or `restore`.
+- **`Control.cs`** → `LKHomeControl`. Takes `query`, `verify`, `apply` or `restore`.
 
 Both refuse to start unless all three guards pass: the process is 32-bit, `getuid()` is 901, and
 `/etc/prd_info.ini` contains the expected firmware string. Any mismatch aborts before a single
@@ -77,8 +77,8 @@ back unchanged:
 
 | Setting | From | To |
 | --- | --- | --- |
-| `main` app-control operation (via `app_operation_set_current_app`) | `com.samsung.tv.csfs` | `Arn0Lnchr0.Launcher` |
-| `db/appfw/home_appid` | `com.samsung.tv.csfs` | `Arn0Lnchr0.Launcher` |
+| `main` app-control operation (via `app_operation_set_current_app`) | `com.samsung.tv.csfs` | `LKLauncher.Launcher` |
+| `db/appfw/home_appid` | `com.samsung.tv.csfs` | `LKLauncher.Launcher` |
 | `db/menu/smart_hub/ontvsetting/auto_start` | saved baseline (`1` on reference TV) | same value |
 
 It reads three further keys (`db/appfw/startup_appid`, `db/appfw/booting_appid_backup`,
@@ -120,7 +120,7 @@ Do these in order. Do not skip the query.
    uid, architecture, firmware, the .NET runtime, the current `vconftool` values and the native
    libraries. It changes nothing.
 
-3. **Query, read-only.** `npm run native:query` runs `Arn0HomeQuery` — before `Arn0HomeControl`
+3. **Query, read-only.** `npm run native:query` runs `LKHomeQuery` — before `LKHomeControl`
    is staged at all. You are checking three things: the guards pass, the keys read back values you
    recognise, and `launcher_boot_supported=1`. If that last one is `0`, the TV is telling you the
    app is not eligible for boot and `apply` will refuse anyway — stop and investigate.
@@ -144,11 +144,11 @@ Do these in order. Do not skip the query.
    ```
 
 5. **Verify the baseline.** `npm run native:verify -- <baseline.json>`. It compares the live values
-   against the file and prints `ARN0_BASELINE_MATCH=` on success. Nothing is written.
+   against the file and prints `LK_BASELINE_MATCH=` on success. Nothing is written.
 
 6. **Apply.** `npm run native:apply -- <baseline.json>`. The runner asks you to type `APPLY`
    first, and refuses outright if the baseline's `Autostart` is `0`. A successful result prints
-   `ARN0_APPLIED=` and a read-back of the Home operation, `home_appid` and `auto_start`. Test Home
+   `LK_APPLIED=` and a read-back of the Home operation, `home_appid` and `auto_start`. Test Home
    from another app, then do the physical checks below. The helper does not change power-on
    settings; validate cold-start behaviour separately before claiming it works.
 
@@ -157,12 +157,12 @@ Do these in order. Do not skip the query.
    (confirmed on `QE65LS03BAUXXU`). Reboot, then test Home from another app.
 
 7. **Know your way back.** `npm run native:restore -- <baseline.json>` restores all saved Home and
-   startup values and prints `ARN0_RESTORED=`.
+   startup values and prints `LK_RESTORED=`.
 
 ### Art Mode and cold boot (Samsung The Frame)
 
 `apply` writes the `main` app-control operation and `db/appfw/home_appid`, and writes `auto_start`
-back unchanged. On a Frame this interacts with Art Mode, and arn0 rated the Frame untested — treat
+back unchanged. On a Frame this interacts with Art Mode, and lk rated the Frame untested — treat
 it as an experiment, not a supported flow.
 
 - **Not at risk.** The Art Mode app (`org.tizen.art-app`: artwork, mattes, brightness) and

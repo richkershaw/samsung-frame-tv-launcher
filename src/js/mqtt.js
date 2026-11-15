@@ -87,7 +87,7 @@
     }
 
     function clientId() {
-        return 'arn0-launcher-' + Math.random().toString(16).slice(2, 8);
+        return 'lk-launcher-' + Math.random().toString(16).slice(2, 8);
     }
 
     function send(bytes) {
@@ -113,7 +113,7 @@
             device: {
                 identifiers: ['framey_launcher'],
                 name: 'Framey launcher',
-                manufacturer: 'arn0-tv'
+                manufacturer: 'lk-tv'
             }
         };
         // Retained, so Home Assistant recreates the sensor after a restart.

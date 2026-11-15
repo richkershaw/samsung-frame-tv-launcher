@@ -26,8 +26,8 @@ care; [the setup guide](docs/setup-tv.md) covers the risks and recovery steps.
 Needs Node.js 20 or newer. Nothing is installed and no TV is involved.
 
 ```sh
-git clone https://github.com/<you>/arn0-tv.git
-cd arn0-tv
+git clone https://github.com/<you>/lk-tv.git
+cd lk-tv
 npm run preview        # http://localhost:8080
 ```
 
@@ -91,7 +91,7 @@ Evidence and limits:
 | Reference device | QE65Q70BATXXC (Q70B, 2022), firmware T-PTMDEUC-1720.7, Tizen 6.5, armv7 |
 | This fork | QE65LS03BAUXXU (The Frame, 2022), same firmware string. Home button confirmed opening the launcher **after a reboot**; Art Mode and cold boot still untested |
 | Install | `.wgt` via Apps2Samsung or Tizen Studio CLI; works |
-| Home button | Tested on the reference device: opens `Arn0Lnchr0.Launcher` |
+| Home button | Tested on the reference device: opens `LKLauncher.Launcher` |
 | Power-on | `auto_start` was `1` and remains `1`; the helper does not change it. Cold-boot behaviour has not been independently validated as part of the Home-button change |
 | Method | Developer Mode, UID 901, platform `vconf` / `aul` calls. **No root.** |
 | Open items | Untested on `auto_start=0` TVs; behaviour after a firmware update unknown |
@@ -103,7 +103,7 @@ Evidence and limits:
 
 ```sh
 npm run preview      # browser preview on :8080
-npm run build        # -> dist/arn0-launcher.wgt
+npm run build        # -> dist/lk-launcher.wgt
 npm run devlog       # receive Lab logs from the TV into logs/tv.jsonl
 node scripts/prepare-wallpapers.mjs <folder>   # regenerate wallpapers from your photos
 

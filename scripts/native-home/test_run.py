@@ -13,11 +13,11 @@ import run
 class HelperChoice(unittest.TestCase):
     def test_read_only_modes_use_the_query_assembly(self):
         for mode in ("inspect", "query"):
-            self.assertEqual(run.helper_name(mode), "Arn0HomeQuery")
+            self.assertEqual(run.helper_name(mode), "LKHomeQuery")
 
     def test_writing_modes_use_the_control_assembly(self):
         for mode in ("verify", "apply", "restore"):
-            self.assertEqual(run.helper_name(mode), "Arn0HomeControl")
+            self.assertEqual(run.helper_name(mode), "LKHomeControl")
 
     def test_every_mode_has_three_files(self):
         for mode in run.MODES:
@@ -29,30 +29,30 @@ class HelperChoice(unittest.TestCase):
 
 class OutputCheck(unittest.TestCase):
     def test_query_success(self):
-        ok, reason = run.check_output("query", "QUERY_BEGIN\nQUERY_END\nARN0_RUN_END\n")
+        ok, reason = run.check_output("query", "QUERY_BEGIN\nQUERY_END\nLK_RUN_END\n")
         self.assertTrue(ok, reason)
 
     def test_query_abort_is_a_failure(self):
-        ok, _ = run.check_output("query", "QUERY_ABORTED=bad\nARN0_RUN_END\n")
+        ok, _ = run.check_output("query", "QUERY_ABORTED=bad\nLK_RUN_END\n")
         self.assertFalse(ok)
 
     def test_control_success_tokens(self):
         cases = {
-            "verify": "ARN0_BASELINE_MATCH={}\nARN0_RUN_END\n",
-            "apply": "ARN0_APPLIED={}\nARN0_RUN_END\n",
-            "restore": "ARN0_RESTORED={}\nARN0_RUN_END\n",
+            "verify": "LK_BASELINE_MATCH={}\nLK_RUN_END\n",
+            "apply": "LK_APPLIED={}\nLK_RUN_END\n",
+            "restore": "LK_RESTORED={}\nLK_RUN_END\n",
         }
         for mode, text in cases.items():
             ok, reason = run.check_output(mode, text)
             self.assertTrue(ok, mode + ": " + reason)
 
     def test_missing_end_marker_is_unknown_not_success(self):
-        ok, reason = run.check_output("apply", "ARN0_APPLIED={}\n")
+        ok, reason = run.check_output("apply", "LK_APPLIED={}\n")
         self.assertFalse(ok)
         self.assertIn("unknown", reason)
 
     def test_control_abort_is_a_failure(self):
-        ok, _ = run.check_output("apply", "ARN0_ABORTED=x\nARN0_RUN_END\n")
+        ok, _ = run.check_output("apply", "LK_ABORTED=x\nLK_RUN_END\n")
         self.assertFalse(ok)
 
 
@@ -106,7 +106,7 @@ class ApplyGate(unittest.TestCase):
 
 class Config(unittest.TestCase):
     def test_env_beats_file(self):
-        cfg = run.build_config({"ARN0_TV_IP": "10.0.0.7"}, {"host": "10.0.0.9"})
+        cfg = run.build_config({"LK_TV_IP": "10.0.0.7"}, {"host": "10.0.0.9"})
         self.assertEqual(cfg["host"], "10.0.0.7")
 
     def test_file_beats_default(self):
@@ -145,7 +145,7 @@ class Injection(unittest.TestCase):
         self.assertIn("|base64${IFS}-d|bash`.tpk", arg)
 
     def test_representative_argument_fits_the_budget(self):
-        arg = run.injection_argument("192.168.1.50", 55555, run.STAGE_DIR + "/arn0-" + "a" * 12 + ".sh", "a" * 12)
+        arg = run.injection_argument("192.168.1.50", 55555, run.STAGE_DIR + "/lk-" + "a" * 12 + ".sh", "a" * 12)
         self.assertLess(len(arg.encode()), run.MAX_ARGUMENT_BYTES)
 
 

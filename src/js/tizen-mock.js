@@ -13,7 +13,7 @@
     }
 
     var apps = [
-        app('Arn0Lnchr0.Launcher', 'Arn0 Launcher'),
+        app('LKLauncher.Launcher', 'LK Launcher'),
         app('xvvl3S1TT1.TizenTubeStandalone', 'TizenTube'),
         app('9Ur5IzDKqV.TizenYouTube', 'YouTube'),
         app('org.tizen.netflix-app', 'Netflix'),
@@ -61,7 +61,7 @@
                 later(ok);
             },
             getCurrentApplication: function () {
-                return { appInfo: { id: 'Arn0Lnchr0.Launcher' }, exit: function () {}, hide: function () {} };
+                return { appInfo: { id: 'LKLauncher.Launcher' }, exit: function () {}, hide: function () {} };
             }
         },
         systeminfo: {
